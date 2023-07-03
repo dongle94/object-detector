@@ -67,19 +67,33 @@ if __name__ == "__main__":
     from utils.config import _C as cfg
     from utils.config import update_config
     from utils.medialoader import MediaLoader
+    from utils.logger import get_logger, init_logger
 
     update_config(cfg, args='./config.yaml')
+    init_logger(cfg)
+    logger = get_logger()
+
     detector = ObjectDetector(cfg=cfg)
 
     s = sys.argv[1]
     media_loader = MediaLoader(s)
     time.sleep(1)
+    f_cnt = 0
+    ts = [0., 0., 0.]
     while True:
         frame = media_loader.get_frame()
 
+        t0 = time.time()
         im = detector.preprocess(frame)
+        t1 = time.time()
         _pred = detector.detect(im)
+        t2 = time.time()
         _pred, _det = detector.postprocess(_pred)
+        t3 = time.time()
+
+        ts[0] += (t1 - t0)
+        ts[1] += (t2 - t1)
+        ts[2] += (t3 - t2)
 
         for d in _det:
             x1, y1, x2, y2 = map(int, d[:4])
@@ -89,6 +103,10 @@ if __name__ == "__main__":
         if cv2.waitKey(1) == ord('q'):
             print("-- CV2 Stop --")
             break
+
+        f_cnt += 1
+        if f_cnt % 10 == 0:
+            logger.debug(f"{f_cnt} Frame - pre: {ts[0]/f_cnt:.4f} / infer: {ts[1]/f_cnt:.4f} / post: {ts[2]/f_cnt:.4f}")
 
     media_loader.stop()
     print("-- Stop program --")

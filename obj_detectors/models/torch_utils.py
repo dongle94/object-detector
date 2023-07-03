@@ -3,6 +3,11 @@ import torch.nn as nn
 from pathlib import Path
 from copy import deepcopy
 
+try:
+    import thop  # for FLOPs computation
+except ImportError:
+    thop = None
+
 
 def fuse_conv_and_bn(conv, bn):
     # Fuse Conv2d() and BatchNorm2d() layers https://tehnokv.com/posts/fusing-batchnorm-and-conv/

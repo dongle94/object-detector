@@ -59,12 +59,12 @@ class YoloDetector(nn.Module):
             return self.from_numpy(y)
 
     @staticmethod
-    def postprocess(_pred, im_shape, im0_shape, max_det=100):
-        _pred = non_max_suppression(_pred, classes=[0], max_det=max_det)[0]
-        _det = scale_boxes(im_shape[2:], copy.deepcopy(_pred[:, :4]), im0_shape).round()
-        _det = torch.cat([_det, _pred[:, 4:]], dim=1)
+    def postprocess(pred, im_shape, im0_shape, max_det=100):
+        pred = non_max_suppression(pred, classes=[0], max_det=max_det)[0]
+        det = scale_boxes(im_shape[2:], copy.deepcopy(pred[:, :4]), im0_shape).round()
+        det = torch.cat([det, pred[:, 4:]], dim=1)
 
-        return _pred, _det
+        return pred, det
 
     def from_numpy(self, x):
         return torch.from_numpy(x).to(self.device) if isinstance(x, np.ndarray) else x
@@ -124,9 +124,9 @@ if __name__ == "__main__":
     img = cv2.imread('./data/images/army.jpg')
     im, im0 = model.preprocess(img)
 
-    pred = model.forward(im)
-    pred, det = model.postprocess(pred, im.shape, im0.shape)
-    for d in det:
+    _pred = model.forward(im)
+    _pred, _det = model.postprocess(_pred, im.shape, im0.shape)
+    for d in _det:
         print(f"box:{int(d[0]), int(d[1]), int(d[2]), int(d[3])}, class: {model.names[int(d[5])]}, conf: {d[4]:.3f}")
 
         x1, y1, x2, y2 = map(int, d[:4])

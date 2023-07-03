@@ -16,62 +16,61 @@ from models.yolo import check_img_size, letterbox, non_max_suppression, scale_bo
 
 
 class YoloDetector(nn.Module):
-    def __init__(self, weight='yolov5s.pt', device="cpu", img_size=640, fp16=False, auto=True, fuse=True):
+    def __init__(self, weight='yolov5s.pt', device: int or str = "cpu", img_size=640, fp16=False, auto=True, fuse=True):
         super().__init__()
 
         device = "cpu" if device == "" else device
         self.device = self.select_device(device)
         self.cuda = torch.cuda.is_available() and device
         self.fp16 = True if fp16 and self.device.type != "cpu" else False
-        model = attempt_load(weight, device=device, inplace=True, fuse=fuse)
-        model.half() if self.fp16 else model.float()
-        self.model = model
-        self.stride = max(int(model.stride.max()), 32)
+        _model = attempt_load(weight, device=device, inplace=True, fuse=fuse)
+        _model.half() if self.fp16 else _model.float()
+        self.model = _model
+        self.stride = max(int(_model.stride.max()), 32)
         self.img_size = check_img_size(img_size, s=self.stride)
-        self.names = model.module.names if hasattr(model, 'module') else model.names  # get class names
+        self.names = _model.module.names if hasattr(_model, 'module') else _model.names  # get class names
         self.auto = auto
 
     def warmup(self, imgsz=(1, 3, 640, 640)):
-        im = torch.empty(*imgsz, dtype=torch.half if self.fp16 else torch.float, device=self.device)  # input
-        self.forward(im)  # warmup
+        _im = torch.empty(*imgsz, dtype=torch.half if self.fp16 else torch.float, device=self.device)  # input
+        self.forward(_im)  # warmup
         print("-- Yolov5 Detector warmup --")
 
-    def preprocess(self, img):
-        im = letterbox(img, self.img_size, stride=self.stride, auto=self.auto)[0]  # padded resize
-        im = im.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
-        im = np.ascontiguousarray(im)  # contiguous
+    def preprocess(self, _img):
+        _im = letterbox(_img, self.img_size, stride=self.stride, auto=self.auto)[0]  # padded resize
+        _im = _im.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
+        _im = np.ascontiguousarray(_im)  # contiguous
 
-        im = torch.from_numpy(im).to(self.device)
-        im = im.half() if self.fp16 else im.float()  # uint8 to fp16/32
-        im /= 255  # 0 - 255 to 0.0 - 1.0
-        if len(im.shape) == 3:
-            im = im[None]  # expand for batch dim
+        _im = torch.from_numpy(_im).to(self.device)
+        _im = _im.half() if self.fp16 else _im.float()  # uint8 to fp16/32
+        _im /= 255  # 0 - 255 to 0.0 - 1.0
+        if len(_im.shape) == 3:
+            _im = torch.unsqueeze(_im, dim=0)     # expand for batch dim
+        return _im, _img
 
-        return im, img
-
-    def forward(self, im):
-        b, ch, h, w = im.shape
-
-        if self.fp16 and im.dtype != torch.float16:
-            im = im.half()  # to FP16
-        y = self.model(im)
+    def forward(self, _im):
+        if self.fp16 and _im.dtype != torch.float16:
+            _im = _im.half()  # to FP16
+        y = self.model(_im)
 
         if isinstance(y, (list, tuple)):
             return self.from_numpy(y[0]) if len(y) == 1 else [self.from_numpy(x) for x in y]
         else:
             return self.from_numpy(y)
 
-    def postprocess(self, pred, im_shape, im0_shape, max_det=100):
-        pred = non_max_suppression(pred, classes=[0], max_det=max_det)[0]
-        det = scale_boxes(im_shape[2:], copy.deepcopy(pred[:, :4]), im0_shape).round()
-        det = torch.cat([det, pred[:, 4:]], dim=1)
+    @staticmethod
+    def postprocess(_pred, im_shape, im0_shape, max_det=100):
+        _pred = non_max_suppression(_pred, classes=[0], max_det=max_det)[0]
+        _det = scale_boxes(im_shape[2:], copy.deepcopy(_pred[:, :4]), im0_shape).round()
+        _det = torch.cat([_det, _pred[:, 4:]], dim=1)
 
-        return pred, det
+        return _pred, _det
 
     def from_numpy(self, x):
         return torch.from_numpy(x).to(self.device) if isinstance(x, np.ndarray) else x
 
-    def select_device(self, device=''):
+    @staticmethod
+    def select_device(device=''):
         device = str(device).strip().lower().replace('cuda', '').replace('none', '')
         cpu = device == 'cpu'
         if cpu:
@@ -87,6 +86,7 @@ class YoloDetector(nn.Module):
             arg = 'cpu'
 
         return torch.device(arg)
+
 
 def attempt_load(weight, device=None, inplace=True, fuse=True):
 
@@ -115,21 +115,23 @@ def attempt_load(weight, device=None, inplace=True, fuse=True):
     # return model
     return ckpt
 
+
 if __name__ == "__main__":
-    model = YoloDetector(weight='./weights/yolov5s6.pt', device=0, img_size=640)
+    model = YoloDetector(weight='./weights/yolov5s6.pt', device=0, img_size=1280)
     model.warmup()
 
     import cv2
-    img = cv2.imread('./data/images/sample.jpg')
+    img = cv2.imread('./data/images/army.jpg')
     im, im0 = model.preprocess(img)
 
     pred = model.forward(im)
     pred, det = model.postprocess(pred, im.shape, im0.shape)
-    print(det)
     for d in det:
+        print(f"box:{int(d[0]), int(d[1]), int(d[2]), int(d[3])}, class: {model.names[int(d[5])]}, conf: {d[4]:.3f}")
+
         x1, y1, x2, y2 = map(int, d[:4])
         cv2.rectangle(im0, (x1, y1), (x2, y2), (128, 128, 255), thickness=2, lineType=cv2.LINE_AA)
-        cv2.putText(im0, f"{int(d[-1])}: {d[-2]:.2f}", (x1, y1), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (128, 0, 255), 1)
+        cv2.putText(im0, f"{model.names[int(d[-1])]}: {d[-2]:.2f}", (x1, y1+10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (128, 0, 255), 1)
 
     cv2.imshow('result', im0)
     cv2.waitKey(0)

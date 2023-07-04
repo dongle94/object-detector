@@ -2,13 +2,52 @@ import os
 import sys
 
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget
+from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QTableWidget, QLineEdit, QLabel, QPushButton
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtCore import QSize, Slot
 
 
-class MainWidget(QWidget):
+class ProdTable(QTableWidget):
     def __init__(self):
         super().__init__()
+
+
+class MainWidget(QWidget):
+    def __init__(self, parent):
+        super().__init__()
+
+        self.main_window = parent
+        print(self.main_window)
+
+        # top - layout
+        self.top = QHBoxLayout()
+        self.el_date = QLineEdit()
+        self.el_client = QLineEdit()
+        self.el_prod_name = QLineEdit()
+        self.bt_search = QPushButton("발주 조회")
+        self.bt_reset = QPushButton("초기화")
+
+        self.top.addWidget(QLabel("날짜:"))
+        self.top.addWidget(self.el_date)
+        self.top.addWidget(QLabel("발주사:"))
+        self.top.addWidget(self.el_client)
+        self.top.addWidget(QLabel("제품명:"))
+        self.top.addWidget(self.el_prod_name)
+        self.top.addWidget(self.bt_search)
+        self.top.addWidget(self.bt_reset)
+
+        # middle - table
+        # self.middle = QTableWidget()
+
+        # Main Widget
+        self.main_layout = QVBoxLayout()
+        self.setLayout(self.main_layout)
+        self.main_layout.addLayout(self.top)
+        # self.main_layout.addWidget(self.middle)
+
+
+        # self.bottom_layout = QHBoxLayout()
+        # self.main_layout.addLayout(self.bottom_layout)
 
 
 class DaolCND(QMainWindow):
@@ -31,7 +70,7 @@ class DaolCND(QMainWindow):
         self.statusBar().showMessage("ready state", 0)
 
         # Set Central Widget
-        self.main_widget = MainWidget()
+        self.main_widget = MainWidget(self)
         self.setCentralWidget(self.main_widget)
 
 

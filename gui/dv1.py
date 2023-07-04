@@ -1,15 +1,108 @@
 import os
 import sys
+from collections import OrderedDict
 
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget
-from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QTableWidget, QLineEdit, QLabel, QPushButton
+from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QTableWidget, QLineEdit, QLabel, QPushButton, QTableWidgetItem, QHeaderView
 from PySide6.QtGui import QAction, QKeySequence
-from PySide6.QtCore import QSize, Slot
+from PySide6.QtCore import Qt, QSize, Slot
+
+ROW = OrderedDict({"chicken": "닭고기류",
+                   "sauce1": "소스 1",
+                   "sauce2": "소스 2",
+                   "powder": "파우더",
+                   "quantity": "발주물량",
+                   "match": "집계물량"})
+PROD = [
+    {
+        "name": "수원왕갈비 꾸닭",
+        "chicken": ["태음융융소금염지닭", 50],
+        "sauce1": ["닭갈비간장", 25],
+        "sauce2": ["갈비레이", 25],
+        "powder": ["에어크런치", 50],
+        "quantity": 50,
+    },
+    {
+        "name": "오리지널 치밥",
+        "chicken": ["후라이드염지닭", 30],
+        "sauce1": ["치밥버무림소스", 15],
+        "sauce2": ["치밥벌크소스", 15],
+        "powder": ["크리스피파우더", 30],
+        "quantity": 30,
+    },
+    {
+        "name": "소이퐁 튀닭",
+        "chicken": ["후라이드염지닭", 50],
+        "sauce1": ["소이퐁소스", 50],
+        "sauce2": [],
+        "powder": ["우리쌀 후레이크파우더", 50],
+        "quantity": 50,
+    },
+    {
+        "name": "공주매콤 닭갈비",
+        "chicken": ["태음융융소금염지닭", 50],
+        "sauce1": ["닭갈비 간장양념", 50],
+        "sauce2": [],
+        "powder": [],
+        "quantity": 50,
+    },
+    {
+        "name": "크리스피 튀닭",
+        "quantity": 50,
+        "chicken": ["핫커리염지닭", 50],
+        "sauce1": ["맛있게매운소스", 25],
+        "sauce2": ["프리마늘소스", 25],
+        "powder": ["크리스피파우더", 50]
+    },
+]
 
 
 class ProdTable(QTableWidget):
-    def __init__(self):
+    def __init__(self, col, row):
         super().__init__()
+        self.col = col
+        self.row = row
+
+        self.set_header()
+        self.set_contents()
+
+    def set_header(self):
+        # Set vertical header
+        self.setRowCount(1 + len(self.row))
+        self.setVerticalHeaderLabels([""] + list(self.row.values()))
+
+        # Set Horizontal header
+        self.horizontalHeader().setVisible(False)
+        self.setColumnCount(len(self.col) * 3)
+        for i, col in enumerate(self.col):
+            self.setSpan(0, 3 * i, 1, 3)
+            self.setItem(0, 3 * i, QTableWidgetItem(col["name"]))
+            self.item(0, 3 * i).setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+
+            # for _i in range(3):
+            #     self.horizontalHeader().setSectionResizeMode(i * 3 + _i,  )
+
+        # Set span not prod
+        for i in range(len(self.col)):
+            self.setSpan(5, 3 * i, 1, 3)
+            self.setSpan(6, 3 * i, 1, 3)
+
+    def set_contents(self):
+        for c, col in enumerate(self.col):
+            for r, (k, v) in enumerate(list(self.row.items())[:5]):
+                if k == "quantity":
+                    self.setItem(r + 1, 3 * c, QTableWidgetItem(str(col[k])))
+                    self.item(r + 1, 3 * c).setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                    continue
+
+                if col[k]:
+                    self.setItem(r + 1, 3 * c, QTableWidgetItem(col[k][0]))
+                    self.setItem(r + 1, 3 * c + 1, QTableWidgetItem(str(col[k][1])))
+                    self.setItem(r + 1, 3 * c + 2, QTableWidgetItem(str(0)))
+                else:
+                    self.setItem(r + 1, 3 * c, QTableWidgetItem("-"))
+
+        self.resizeColumnsToContents()
 
 
 class MainWidget(QWidget):
@@ -17,7 +110,6 @@ class MainWidget(QWidget):
         super().__init__()
 
         self.main_window = parent
-        print(self.main_window)
 
         # top - layout
         self.top = QHBoxLayout()
@@ -37,7 +129,7 @@ class MainWidget(QWidget):
         self.top.addWidget(self.bt_reset)
 
         # middle - table
-        self.middle = ProdTable()
+        self.middle = ProdTable(col=PROD, row=ROW)
 
         # bottom - layout
         self.bottom = QHBoxLayout()

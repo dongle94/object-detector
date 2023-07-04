@@ -37,17 +37,24 @@ class MainWidget(QWidget):
         self.top.addWidget(self.bt_reset)
 
         # middle - table
-        # self.middle = QTableWidget()
+        self.middle = ProdTable()
+
+        # bottom - layout
+        self.bottom = QHBoxLayout()
+        self.bt_start = QPushButton("수량 학인 시작")
+        self.bt_stop = QPushButton("수량 확인 종료")
+
+        self.bottom.addWidget(self.bt_start)
+        self.bottom.addWidget(self.bt_stop)
 
         # Main Widget
         self.main_layout = QVBoxLayout()
         self.setLayout(self.main_layout)
         self.main_layout.addLayout(self.top)
-        # self.main_layout.addWidget(self.middle)
+        self.main_layout.addWidget(self.middle)
+        self.main_layout.addLayout(self.bottom)
 
 
-        # self.bottom_layout = QHBoxLayout()
-        # self.main_layout.addLayout(self.bottom_layout)
 
 
 class DaolCND(QMainWindow):

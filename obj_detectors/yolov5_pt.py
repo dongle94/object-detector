@@ -12,7 +12,7 @@ if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
 os.chdir(ROOT)
 
-from models.yolo import check_img_size, letterbox, non_max_suppression, scale_boxes
+from obj_detectors.models.yolo import check_img_size, letterbox, non_max_suppression, scale_boxes
 
 
 class YoloDetector(nn.Module):
@@ -117,7 +117,7 @@ def attempt_load(weight, device=None, inplace=True, fuse=True):
 
 
 if __name__ == "__main__":
-    model = YoloDetector(weight='./weights/yolov5s6.pt', device=0, img_size=1280)
+    model = YoloDetector(weight='./weights/yolov5s.pt', device=0, img_size=640)
     model.warmup()
 
     import cv2

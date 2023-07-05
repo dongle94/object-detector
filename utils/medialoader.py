@@ -20,13 +20,15 @@ def check_sources(source):
 
 
 class MediaLoader(object):
-    def __init__(self, source, save_result=False, save_path="", stride=1):
+    def __init__(self, source, save_result=False, save_path="", stride=1, logger=None):
         self.stride = stride
         self.is_file, self.is_url, self.is_webcam = check_sources(source)
 
         source = os.path.abspath(source) if os.path.isfile(source) else source
         self.source = str(source)
         self.img, self.fps, self.frame, self.thread = None, 0, 0, None
+
+        self.logger = logger
 
         source = eval(source) if source.isnumeric() else source
         cap = cv2.VideoCapture(source)
@@ -83,21 +85,28 @@ class MediaLoader(object):
         frame = self.get_frame()
         cv2.imshow("frame", frame)
         if cv2.waitKey(wait_sec) == ord('q'):
-            print("-- Quit Show frames")
+            if self.logger is not None:
+               self.logger.info("-- Quit Show frames")
             raise StopIteration
 
     def stop(self):
         self.alive = False
+        if self.logger is not None:
+            self.logger.info("Stop Update thread")
         self.thread.join(timeout=1)
 
     def pause(self):
         self.bpause = True
+        if self.logger is not None:
+            self.logger.info("Pause Update thread")
 
     def is_pause(self):
         return self.bpause
 
     def restart(self):
         self.bpause = False
+        if self.logger is not None:
+            self.logger.info("Restart Update thread")
 
     def __del__(self):
         self.cap.release()

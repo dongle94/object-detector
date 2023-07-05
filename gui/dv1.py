@@ -1,11 +1,23 @@
 import os
 import sys
+import argparse
 from collections import OrderedDict
 
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget
-from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QTableWidget, QLineEdit, QLabel, QPushButton, QTableWidgetItem, QHeaderView
-from PySide6.QtGui import QAction, QKeySequence
+from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QTableWidget, QLineEdit, QLabel, QPushButton, QTableWidgetItem
+from PySide6.QtGui import QAction
 from PySide6.QtCore import Qt, QSize, Slot
+
+from pathlib import Path
+FILE = Path(__file__).resolve()
+ROOT = FILE.parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))  # add ROOT to PATH
+os.chdir(ROOT)
+
+from utils.config import _C as cfg, update_config
+# from obj_detectors.obj_detector import ObjectDetector
+
 
 ROW = OrderedDict({"chicken": "닭고기류",
                    "sauce1": "소스 1",
@@ -172,8 +184,9 @@ class MainWidget(QWidget):
 
 
 class DaolCND(QMainWindow):
-    def __init__(self):
+    def __init__(self, config=None):
         super().__init__()
+        # resize window
         self.geo = self.screen().availableGeometry()
         self.resize(QSize(self.geo.width() * 0.5, self.geo.height() * 0.5))
 
@@ -194,11 +207,27 @@ class DaolCND(QMainWindow):
         self.main_widget = MainWidget(self)
         self.setCentralWidget(self.main_widget)
 
+        # Get Object Detector
+        self.config = config
+        #self.obj_detector = ObjectDetector(cfg=self.config)
+
+
+def args_parse():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-c', '--config', type=str, help='configuration')
+    _args = parser.parse_args()
+    return _args
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
 
-    app_gui = DaolCND()
+    # Get Configuration
+    args = args_parse()
+    _cfg = args.config
+    update_config(cfg, _cfg)
+
+    app_gui = DaolCND(cfg)
     app_gui.setWindowTitle("다올씨앤디")
     app_gui.show()
 

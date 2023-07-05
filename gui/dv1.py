@@ -1,12 +1,13 @@
 import os
 import sys
 import argparse
+import cv2
 from collections import OrderedDict
 
-from PySide6.QtWidgets import QApplication, QMainWindow, QWidget
+from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QDialog
 from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QTableWidget, QLineEdit, QLabel, QPushButton, QTableWidgetItem
-from PySide6.QtGui import QAction
-from PySide6.QtCore import Qt, QSize, Slot
+from PySide6.QtGui import QAction, QImage
+from PySide6.QtCore import Qt, QSize, Slot, QThread
 
 from pathlib import Path
 FILE = Path(__file__).resolve()
@@ -17,7 +18,8 @@ os.chdir(ROOT)
 
 from utils.config import _C as cfg, update_config
 from utils.logger import init_logger, get_logger
-# from obj_detectors.obj_detector import ObjectDetector
+from obj_detectors.obj_detector import ObjectDetector
+from utils.medialoader import MediaLoader
 
 
 ROW = OrderedDict({"chicken": "닭고기류",
@@ -70,14 +72,36 @@ PROD = [
 ]
 
 
+class UpdateThread(QThread):
+    def __init__(self, parent=None, medialoader=None, statusbar=None):
+        super().__init__(parent=parent)
+        self.medialoader = medialoader
+        self.sbar = statusbar
+        self.stop = False
+
+    def run(self):
+        self.medialoader.restart()
+        self.sbar.showMessage("입력 영상 송출")
+        self.stop = False
+        while True:
+            frame = self.medialoader.get_frame()
+            if frame is None or self.stop is True:
+                break
+            print(frame.shape)
+            # cv2.imshow("input", frame)
+            img = QImage(frame.data, frame.shape[1], frame.shape[0], QImage.Format.Format_BGR888)
+            # img.save("/home/dongle94/t.jpg")
+
+        # cv2.destroyAllWindows()
+        self.sbar.showMessage("입력 영상 종료")
+
+
 class ProdTable(QTableWidget):
     def __init__(self, col, row):
         super().__init__()
         self.col = col
         self.row = row
 
-        # self.set_header()
-        # self.set_contents()
 
     def set_header(self):
         # Set vertical header
@@ -163,9 +187,14 @@ class MainWidget(QWidget):
         self.bottom = QHBoxLayout()
         self.bt_start = QPushButton("수량 학인 시작")
         self.bt_stop = QPushButton("수량 확인 종료")
+        # self.bt_show = QPushButton("실시간 영상 보기")
+        self.bt_start.setDisabled(True)
+        self.bt_stop.setDisabled(True)
+        # self.bt_show.setDisabled(True)
 
         self.bottom.addWidget(self.bt_start)
         self.bottom.addWidget(self.bt_stop)
+        # self.bottom.addWidget(self.bt_show)
 
         # Main Widget
         self.main_layout = QVBoxLayout()
@@ -174,23 +203,67 @@ class MainWidget(QWidget):
         self.main_layout.addWidget(self.middle)
         self.main_layout.addLayout(self.bottom)
 
+        # Status bar
+        self.sbar = self.main_window.statusBar()
+
+        # Set Input Loader
+        self.medialoader = self.main_window.media_loader
+        self.medialoader.start()
+        self.medialoader.pause()
+
+        self.analysis_thread = UpdateThread(self, self.medialoader, self.sbar)
+
+
         # signals & slots
         self.bt_search.clicked.connect(self.set_table)
         self.bt_reset.clicked.connect(self.clear_table)
+        self.bt_start.clicked.connect(self.start_analysis)
+        self.bt_stop.clicked.connect(self.stop_analysis)
+        # self.bt_show.clicked.connect(self.show_analysis)
 
+        self.sbar.showMessage("프로그램 준비 완료")
         self.logger.info("Create Main QWidget - end")
+
 
     @Slot()
     def set_table(self):
         self.logger.info("set_table - start")
         self.middle.show_table()
+
+        self.bt_start.setDisabled(False)
+        self.bt_stop.setDisabled(False)
+        # self.bt_show.setDisabled(False)
+        self.sbar.showMessage("발주 내용 조회")
         self.logger.info("set_table - end")
 
     @Slot()
     def clear_table(self):
         self.logger.info("clear_table - start")
         self.middle.clear_table()
+
+        self.bt_start.setDisabled(True)
+        self.bt_stop.setDisabled(True)
+        # self.bt_show.setDisabled(True)
+        self.sbar.showMessage("테이블 초기화")
         self.logger.info("clear_table - end")
+
+    @Slot()
+    def start_analysis(self):
+        self.logger.info("Start analysis")
+
+    @Slot()
+    def stop_analysis(self):
+        self.logger.info("Stop analysis")
+        # self.analysis_thread.stop = True
+        # self.analysis_thread.exit()
+
+    # @Slot()
+    # def show_analysis(self):
+    #     self.logger.info("Show input videos")
+    #     dlg = QDialog(self)
+    #     dlg.setWindowTitle("HELLO!")
+    #     dlg.exec_()
+    #     #self.analysis_thread.start()
 
 
 class DaolCND(QMainWindow):
@@ -215,15 +288,16 @@ class DaolCND(QMainWindow):
         self.file_menu.addAction(exit_action)
 
         # Status Bar
-        self.statusBar().showMessage("ready state", 0)
+        self.statusBar().showMessage("프로그램 준비 시작", 0)
+
+        # Get Object Detector
+        self.config = config
+        self.obj_detector = ObjectDetector(cfg=self.config)
+        self.media_loader = MediaLoader(source="0", logger=self.logger)
 
         # Set Central Widget
         self.main_widget = MainWidget(self)
         self.setCentralWidget(self.main_widget)
-
-        # Get Object Detector
-        self.config = config
-        #self.obj_detector = ObjectDetector(cfg=self.config)
 
         self.logger.info("Init DaolCND QMainWindow - end")
 

@@ -16,6 +16,7 @@ if str(ROOT) not in sys.path:
 os.chdir(ROOT)
 
 from utils.config import _C as cfg, update_config
+from utils.logger import init_logger, get_logger
 # from obj_detectors.obj_detector import ObjectDetector
 
 
@@ -133,6 +134,9 @@ class MainWidget(QWidget):
     def __init__(self, parent):
         super().__init__()
 
+        # init MainWidget
+        self.logger = get_logger()
+        self.logger.info("Create Main QWidget - start")
         self.main_window = parent
 
         # top - layout
@@ -174,18 +178,28 @@ class MainWidget(QWidget):
         self.bt_search.clicked.connect(self.set_table)
         self.bt_reset.clicked.connect(self.clear_table)
 
+        self.logger.info("Create Main QWidget - end")
+
     @Slot()
     def set_table(self):
+        self.logger.info("set_table - start")
         self.middle.show_table()
+        self.logger.info("set_table - end")
 
     @Slot()
     def clear_table(self):
+        self.logger.info("clear_table - start")
         self.middle.clear_table()
+        self.logger.info("clear_table - end")
 
 
 class DaolCND(QMainWindow):
     def __init__(self, config=None):
         super().__init__()
+        # init gui
+        self.logger = get_logger()
+        self.logger.info("Init DaolCND QMainWindow - start")
+
         # resize window
         self.geo = self.screen().availableGeometry()
         self.resize(QSize(self.geo.width() * 0.5, self.geo.height() * 0.5))
@@ -211,6 +225,8 @@ class DaolCND(QMainWindow):
         self.config = config
         #self.obj_detector = ObjectDetector(cfg=self.config)
 
+        self.logger.info("Init DaolCND QMainWindow - end")
+
 
 def args_parse():
     parser = argparse.ArgumentParser()
@@ -226,6 +242,9 @@ if __name__ == "__main__":
     args = args_parse()
     _cfg = args.config
     update_config(cfg, _cfg)
+
+    # initialize logger
+    init_logger(cfg=cfg)
 
     app_gui = DaolCND(cfg)
     app_gui.setWindowTitle("다올씨앤디")

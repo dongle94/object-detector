@@ -63,8 +63,8 @@ class ProdTable(QTableWidget):
         self.col = col
         self.row = row
 
-        self.set_header()
-        self.set_contents()
+        # self.set_header()
+        # self.set_contents()
 
     def set_header(self):
         # Set vertical header
@@ -103,6 +103,18 @@ class ProdTable(QTableWidget):
                     self.setItem(r + 1, 3 * c, QTableWidgetItem("-"))
 
         self.resizeColumnsToContents()
+
+    def show_table(self):
+        self.set_header()
+        self.set_contents()
+
+    def clear_table(self):
+        self.clear()
+
+        # Delete each rows
+        r_cnt = self.rowCount()
+        for r in range(r_cnt):
+            self.removeRow(r_cnt - r - 1)
 
 
 class MainWidget(QWidget):
@@ -146,7 +158,17 @@ class MainWidget(QWidget):
         self.main_layout.addWidget(self.middle)
         self.main_layout.addLayout(self.bottom)
 
+        # signals & slots
+        self.bt_search.clicked.connect(self.set_table)
+        self.bt_reset.clicked.connect(self.clear_table)
 
+    @Slot()
+    def set_table(self):
+        self.middle.show_table()
+
+    @Slot()
+    def clear_table(self):
+        self.middle.clear_table()
 
 
 class DaolCND(QMainWindow):

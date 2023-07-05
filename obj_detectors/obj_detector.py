@@ -77,7 +77,12 @@ if __name__ == "__main__":
 
     s = sys.argv[1]
     media_loader = MediaLoader(s)
-    time.sleep(1)
+    media_loader.start()
+
+    while media_loader.is_frame_ready() is False:
+        time.sleep(0.01)
+        continue
+
     f_cnt = 0
     ts = [0., 0., 0.]
     while True:

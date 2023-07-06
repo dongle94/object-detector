@@ -7,7 +7,7 @@ from collections import OrderedDict
 
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QDialog
 from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QTableWidget, QLineEdit, QLabel, QPushButton, QTableWidgetItem
-from PySide6.QtGui import QAction, QImage
+from PySide6.QtGui import QAction, QImage, QPixmap
 from PySide6.QtCore import Qt, QSize, Slot, QThread
 
 from pathlib import Path
@@ -74,11 +74,13 @@ PROD = [
 
 
 class AnalysisThread(QThread):
-    def __init__(self, parent=None, medialoader=None, statusbar=None, detector=None):
+    def __init__(self, parent=None, medialoader=None, statusbar=None, detector=None, img_viewer=None):
         super().__init__(parent=parent)
-        self.medialoader = medialoader
-        self.sbar = statusbar
+        self.medialoader = medialoader if medialoader is not None else self.parent().medialoader
+        self.sbar = statusbar if statusbar is not None else self.parent().sbar
         self.detector = detector
+        self.viewer = img_viewer
+
         self.stop = False
 
     def run(self):
@@ -93,16 +95,37 @@ class AnalysisThread(QThread):
             im = self.detector.preprocess(frame)
             _pred = self.detector.detect(im)
             _pred, _det = self.detector.postprocess(_pred)
-
+            for d in _det:
+                x1, y1, x2, y2 = map(int, d[:4])
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (96, 96, 216), thickness=2, lineType=cv2.LINE_AA)
 
             # cv2.imshow("input", frame)
             img = QImage(frame.data, frame.shape[1], frame.shape[0], QImage.Format.Format_BGR888)
-            # img.save("/home/dongle94/t.jpg")
+            self.viewer.set_image(img)
 
             time.sleep(0.005)
 
         # cv2.destroyAllWindows()
         self.sbar.showMessage("입력 영상 종료")
+
+
+class ImageDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__()
+
+        layout = QVBoxLayout()
+        self.img = QImage()
+
+        self.img_label = QLabel()
+        layout.addWidget(self.img_label)
+
+        self.setLayout(layout)
+        self.setWindowTitle("분석화면")
+        self.setWindowModality(Qt.WindowModality.NonModal)
+
+    def set_image(self, img):
+        self.img_label.setPixmap(QPixmap.fromImage(img))
+
 
 
 class ProdTable(QTableWidget):
@@ -165,12 +188,11 @@ class ProdTable(QTableWidget):
 
 class MainWidget(QWidget):
     def __init__(self, parent):
-        super().__init__()
+        super().__init__(parent=parent)
 
         # init MainWidget
         self.logger = get_logger()
         self.logger.info("Create Main QWidget - start")
-        self.main_window = parent
 
         # top - layout
         self.top = QHBoxLayout()
@@ -205,6 +227,9 @@ class MainWidget(QWidget):
         self.bottom.addWidget(self.bt_stop)
         # self.bottom.addWidget(self.bt_show)
 
+        # show
+        self.dialog = ImageDialog()
+
         # Main Widget
         self.main_layout = QVBoxLayout()
         self.setLayout(self.main_layout)
@@ -213,14 +238,18 @@ class MainWidget(QWidget):
         self.main_layout.addLayout(self.bottom)
 
         # Status bar
-        self.sbar = self.main_window.statusBar()
+        self.sbar = self.parent().statusBar()
 
         # Set Input Loader
-        self.medialoader = self.main_window.media_loader
+        self.medialoader = self.parent().media_loader
         self.medialoader.start()
         self.medialoader.pause()
 
-        self.analysis_thread = AnalysisThread(self, self.medialoader, self.sbar, self.main_window.obj_detector)
+        self.analysis_thread = AnalysisThread(parent=self,
+                                              medialoader=self.medialoader,
+                                              statusbar=self.sbar,
+                                              detector=self.parent().obj_detector,
+                                              img_viewer=self.dialog)
 
         # signals & slots
         self.bt_search.clicked.connect(self.set_table)
@@ -260,11 +289,15 @@ class MainWidget(QWidget):
         self.logger.info("Start analysis")
         self.analysis_thread.start()
 
+        self.dialog.show()
+
     @Slot()
     def stop_analysis(self):
         self.logger.info("Stop analysis")
         self.analysis_thread.stop = True
         self.analysis_thread.exit()
+
+        self.dialog.close()
 
 
 class DaolCND(QMainWindow):

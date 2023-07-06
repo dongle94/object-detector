@@ -1,6 +1,7 @@
 import os
 import sys
 import argparse
+import time
 import cv2
 from collections import OrderedDict
 
@@ -72,11 +73,12 @@ PROD = [
 ]
 
 
-class UpdateThread(QThread):
-    def __init__(self, parent=None, medialoader=None, statusbar=None):
+class AnalysisThread(QThread):
+    def __init__(self, parent=None, medialoader=None, statusbar=None, detector=None):
         super().__init__(parent=parent)
         self.medialoader = medialoader
         self.sbar = statusbar
+        self.detector = detector
         self.stop = False
 
     def run(self):
@@ -87,10 +89,17 @@ class UpdateThread(QThread):
             frame = self.medialoader.get_frame()
             if frame is None or self.stop is True:
                 break
-            print(frame.shape)
+
+            im = self.detector.preprocess(frame)
+            _pred = self.detector.detect(im)
+            _pred, _det = self.detector.postprocess(_pred)
+
+
             # cv2.imshow("input", frame)
             img = QImage(frame.data, frame.shape[1], frame.shape[0], QImage.Format.Format_BGR888)
             # img.save("/home/dongle94/t.jpg")
+
+            time.sleep(0.005)
 
         # cv2.destroyAllWindows()
         self.sbar.showMessage("입력 영상 종료")
@@ -211,8 +220,7 @@ class MainWidget(QWidget):
         self.medialoader.start()
         self.medialoader.pause()
 
-        self.analysis_thread = UpdateThread(self, self.medialoader, self.sbar)
-
+        self.analysis_thread = AnalysisThread(self, self.medialoader, self.sbar, self.main_window.obj_detector)
 
         # signals & slots
         self.bt_search.clicked.connect(self.set_table)
@@ -250,20 +258,13 @@ class MainWidget(QWidget):
     @Slot()
     def start_analysis(self):
         self.logger.info("Start analysis")
+        self.analysis_thread.start()
 
     @Slot()
     def stop_analysis(self):
         self.logger.info("Stop analysis")
-        # self.analysis_thread.stop = True
-        # self.analysis_thread.exit()
-
-    # @Slot()
-    # def show_analysis(self):
-    #     self.logger.info("Show input videos")
-    #     dlg = QDialog(self)
-    #     dlg.setWindowTitle("HELLO!")
-    #     dlg.exec_()
-    #     #self.analysis_thread.start()
+        self.analysis_thread.stop = True
+        self.analysis_thread.exit()
 
 
 class DaolCND(QMainWindow):

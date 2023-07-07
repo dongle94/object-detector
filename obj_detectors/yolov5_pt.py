@@ -12,7 +12,8 @@ if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
 os.chdir(ROOT)
 
-from models.yolo import check_img_size, letterbox, non_max_suppression, scale_boxes
+from obj_detectors.models.yolo import check_img_size, letterbox, non_max_suppression, scale_boxes
+from obj_detectors.models.torch_utils import select_device
 
 
 class YoloDetector(nn.Module):
@@ -20,7 +21,7 @@ class YoloDetector(nn.Module):
         super().__init__()
 
         device = "cpu" if device == "" else device
-        self.device = self.select_device(device)
+        self.device = select_device(device)
         self.cuda = torch.cuda.is_available() and device
         self.fp16 = True if fp16 and self.device.type != "cpu" else False
         _model = attempt_load(weight, device=device, inplace=True, fuse=fuse)
@@ -68,24 +69,6 @@ class YoloDetector(nn.Module):
 
     def from_numpy(self, x):
         return torch.from_numpy(x).to(self.device) if isinstance(x, np.ndarray) else x
-
-    @staticmethod
-    def select_device(device=''):
-        device = str(device).strip().lower().replace('cuda', '').replace('none', '')
-        cpu = device == 'cpu'
-        if cpu:
-            os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
-        elif device:  # non-cpu device requested
-            os.environ[
-                'CUDA_VISIBLE_DEVICES'] = device  # set environment variable - must be before assert is_available()
-
-        if not cpu and torch.cuda.is_available():
-            device = device if device else '0'
-            arg = 'cuda:0'
-        else:
-            arg = 'cpu'
-
-        return torch.device(arg)
 
 
 def attempt_load(weight, device=None, inplace=True, fuse=True):

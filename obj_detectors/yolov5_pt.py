@@ -12,7 +12,8 @@ if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
 os.chdir(ROOT)
 
-from models.yolo import check_img_size, letterbox, non_max_suppression, scale_boxes
+from obj_detectors.models.yolo import check_img_size, letterbox, non_max_suppression, scale_boxes
+from obj_detectors.models.torch_utils import select_device
 
 
 class YoloDetector(nn.Module):
@@ -20,7 +21,7 @@ class YoloDetector(nn.Module):
         super().__init__()
 
         device = "cpu" if device == "" else device
-        self.device = self.select_device(device)
+        self.device = select_device(device)
         self.cuda = torch.cuda.is_available() and device
         self.fp16 = True if fp16 and self.device.type != "cpu" else False
         _model = attempt_load(weight, device=device, inplace=True, fuse=fuse)
@@ -33,7 +34,7 @@ class YoloDetector(nn.Module):
 
     def warmup(self, imgsz=(1, 3, 640, 640)):
         _im = torch.empty(*imgsz, dtype=torch.half if self.fp16 else torch.float, device=self.device)  # input
-        self.forward(_im)  # warmup
+        self.infer(_im)  # warmup
         print("-- Yolov5 Detector warmup --")
 
     def preprocess(self, _img):
@@ -48,7 +49,7 @@ class YoloDetector(nn.Module):
             _im = torch.unsqueeze(_im, dim=0)     # expand for batch dim
         return _im, _img
 
-    def forward(self, _im):
+    def infer(self, _im):
         if self.fp16 and _im.dtype != torch.float16:
             _im = _im.half()  # to FP16
         y = self.model(_im)
@@ -64,28 +65,10 @@ class YoloDetector(nn.Module):
         det = scale_boxes(im_shape[2:], copy.deepcopy(pred[:, :4]), im0_shape).round()
         det = torch.cat([det, pred[:, 4:]], dim=1)
 
-        return pred, det
+        return pred.cpu().numpy(), det.cpu().numpy()
 
     def from_numpy(self, x):
         return torch.from_numpy(x).to(self.device) if isinstance(x, np.ndarray) else x
-
-    @staticmethod
-    def select_device(device=''):
-        device = str(device).strip().lower().replace('cuda', '').replace('none', '')
-        cpu = device == 'cpu'
-        if cpu:
-            os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
-        elif device:  # non-cpu device requested
-            os.environ[
-                'CUDA_VISIBLE_DEVICES'] = device  # set environment variable - must be before assert is_available()
-
-        if not cpu and torch.cuda.is_available():
-            device = device if device else '0'
-            arg = 'cuda:0'
-        else:
-            arg = 'cpu'
-
-        return torch.device(arg)
 
 
 def attempt_load(weight, device=None, inplace=True, fuse=True):
@@ -124,7 +107,7 @@ if __name__ == "__main__":
     img = cv2.imread('./data/images/army.jpg')
     im, im0 = model.preprocess(img)
 
-    _pred = model.forward(im)
+    _pred = model.infer(im)
     _pred, _det = model.postprocess(_pred, im.shape, im0.shape)
     for d in _det:
         print(f"box:{int(d[0]), int(d[1]), int(d[2]), int(d[3])}, class: {model.names[int(d[5])]}, conf: {d[4]:.3f}")

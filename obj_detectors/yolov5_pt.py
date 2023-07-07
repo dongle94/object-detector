@@ -34,7 +34,7 @@ class YoloDetector(nn.Module):
 
     def warmup(self, imgsz=(1, 3, 640, 640)):
         _im = torch.empty(*imgsz, dtype=torch.half if self.fp16 else torch.float, device=self.device)  # input
-        self.forward(_im)  # warmup
+        self.infer(_im)  # warmup
         print("-- Yolov5 Detector warmup --")
 
     def preprocess(self, _img):
@@ -49,7 +49,7 @@ class YoloDetector(nn.Module):
             _im = torch.unsqueeze(_im, dim=0)     # expand for batch dim
         return _im, _img
 
-    def forward(self, _im):
+    def infer(self, _im):
         if self.fp16 and _im.dtype != torch.float16:
             _im = _im.half()  # to FP16
         y = self.model(_im)
@@ -65,7 +65,7 @@ class YoloDetector(nn.Module):
         det = scale_boxes(im_shape[2:], copy.deepcopy(pred[:, :4]), im0_shape).round()
         det = torch.cat([det, pred[:, 4:]], dim=1)
 
-        return pred, det
+        return pred.cpu().numpy(), det.cpu().numpy()
 
     def from_numpy(self, x):
         return torch.from_numpy(x).to(self.device) if isinstance(x, np.ndarray) else x
@@ -107,7 +107,7 @@ if __name__ == "__main__":
     img = cv2.imread('./data/images/army.jpg')
     im, im0 = model.preprocess(img)
 
-    _pred = model.forward(im)
+    _pred = model.infer(im)
     _pred, _det = model.postprocess(_pred, im.shape, im0.shape)
     for d in _det:
         print(f"box:{int(d[0]), int(d[1]), int(d[2]), int(d[3])}, class: {model.names[int(d[5])]}, conf: {d[4]:.3f}")

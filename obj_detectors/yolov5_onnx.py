@@ -64,8 +64,8 @@ class YoloOnnxDetector(object):
 
         return ret
 
-    def postprocess(self, pred, im_shape, im0_shape):
-        pred = non_max_suppression(preds=pred)[0]
+    def postprocess(self, pred, im_shape, im0_shape, max_det=100):
+        pred = non_max_suppression(preds=pred, classes=[0], max_det=max_det)[0]
         det = scale_boxes(im_shape[2:], copy.deepcopy(pred[:, :4]), im0_shape).round()
         det = np.concatenate([det, pred[:, 4:]], axis=1)
 

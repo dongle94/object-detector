@@ -9,8 +9,6 @@ if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 os.chdir(ROOT)
 
-from obj_detectors.yolov5_pt import YoloDetector
-
 
 class ObjectDetector(object):
     def __init__(self, cfg=None):
@@ -29,7 +27,13 @@ class ObjectDetector(object):
             self.im0_shape = None
 
             # model load with weight
-            self.detector = YoloDetector(weight=weight, device=device, img_size=img_size, fp16=fp16)
+            ext = os.path.splitext(weight)[1]
+            if ext in ['.pt', '.pth']:
+                from obj_detectors.yolov5_pt import YoloDetector
+                self.detector = YoloDetector(weight=weight, device=device, img_size=img_size, fp16=fp16)
+            elif ext == '.onnx':
+                from obj_detectors.yolov5_onnx import YoloOnnxDetector
+                self.detector = YoloOnnxDetector(weight=weight, device=device, img_size=img_size)
 
             # warm up
             self.detector.warmup(imgsz=(1, 3, img_size, img_size))
@@ -45,7 +49,7 @@ class ObjectDetector(object):
     def detect(self, img):
         preds = None
         if self.detector_type == "yolo":
-            preds = self.detector.forward(img)
+            preds = self.detector.infer(img)
 
         return preds
 
@@ -55,8 +59,6 @@ class ObjectDetector(object):
             max_det = 100
             preds, dets = self.detector.postprocess(pred=ret, im_shape=self.im_shape,
                                                     im0_shape=self.im0_shape, max_det=max_det)
-            preds = preds.cpu().numpy()
-            dets = dets.cpu().numpy()
 
         return preds, dets
 

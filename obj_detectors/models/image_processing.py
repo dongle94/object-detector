@@ -60,7 +60,7 @@ def xywh2xyxy(x):
     return y
 
 
-def non_max_suppression(preds: np.ndarray, iou_thres: float = 0.45, conf_thres: float = 0.25):
+def non_max_suppression(preds: np.ndarray, iou_thres: float = 0.45, conf_thres: float = 0.25, classes=None, max_det=300):
     # Checks
     if isinstance(preds, (list, tuple)):  # YOLOv5 model in validation model, output = (inference_out, loss_out)
         preds = preds[0]  # select only inference output
@@ -70,7 +70,7 @@ def non_max_suppression(preds: np.ndarray, iou_thres: float = 0.45, conf_thres: 
     loc_confs = preds[..., 4]                # (bs, 25200,) -> float
     loc_candidates = loc_confs > conf_thres     # (bs, 25200,) -> True/False
     mi = 5 + num_classes
-    max_nms = 30
+    max_nms = max_det
 
     output = []
     for pred_idx, pred in enumerate(preds): # image batch index, prediction
@@ -78,7 +78,6 @@ def non_max_suppression(preds: np.ndarray, iou_thres: float = 0.45, conf_thres: 
 
         if not pred.shape[0]:
             continue
-        rows, colunms = pred.shape
 
         # Compute conf
         pred[:, 5:] *= pred[:, 4:5]      # conf = loc_conf * cls_conf
@@ -90,6 +89,11 @@ def non_max_suppression(preds: np.ndarray, iou_thres: float = 0.45, conf_thres: 
         conf, j = np.max(pred[:, 5:mi], axis=1, keepdims=True), np.argmax(pred[:, 5:mi], axis=1, keepdims=True)
         pred = np.concatenate((box, conf, j), axis=1, dtype=np.float32)
 
+        # Filter by class
+        if classes is not None:
+            pred = pred[(pred[:, 5:6] == np.array(classes)).any(1)]
+
+        rows, colunms = pred.shape
         n = pred.shape[0]
         if not n:
             continue

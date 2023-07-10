@@ -20,13 +20,15 @@ def check_sources(source):
 
 
 class MediaLoader(object):
-    def __init__(self, source, save_result=False, save_path="", stride=1):
+    def __init__(self, source, save_result=False, save_path="", stride=1, logger=None):
         self.stride = stride
         self.is_file, self.is_url, self.is_webcam = check_sources(source)
 
         source = os.path.abspath(source) if os.path.isfile(source) else source
         self.source = str(source)
         self.img, self.fps, self.frame, self.thread = None, 0, 0, None
+
+        self.logger = logger
 
         source = eval(source) if source.isnumeric() else source
         cap = cv2.VideoCapture(source)
@@ -46,12 +48,18 @@ class MediaLoader(object):
         self.thread = Thread(target=self.update, args=([cap, source, wait_ms]), daemon=True)
         print(f"-- Success ({self.frame} frames {self.w}x{self.h} at {self.fps:.2f} FPS)")
         self.alive = True
-        self.thread.start()
+        self.bpause = False
 
+    def start(self):
+        self.bpause = False
+        self.thread.start()
 
     def update(self, cap, stream, wait_ms=0.01):
         n, f = 0, self.frame
         while cap.isOpened() and n < f and self.alive:
+            if self.bpause is True:
+                time.sleep(0.01)
+                continue
             n += 1
             cap.grab()
             if n % self.stride == 0:
@@ -73,15 +81,32 @@ class MediaLoader(object):
         orig_im = self.img.copy()
         return orig_im
 
-    def show_frame(self, wait_sec:int=0):
+    def show_frame(self, wait_sec: int = 0):
         frame = self.get_frame()
         cv2.imshow("frame", frame)
         if cv2.waitKey(wait_sec) == ord('q'):
+            if self.logger is not None:
+               self.logger.info("-- Quit Show frames")
             raise StopIteration
 
     def stop(self):
         self.alive = False
+        if self.logger is not None:
+            self.logger.info("Stop Update thread")
         self.thread.join(timeout=1)
+
+    def pause(self):
+        self.bpause = True
+        if self.logger is not None:
+            self.logger.info("Pause Update thread")
+
+    def is_pause(self):
+        return self.bpause
+
+    def restart(self):
+        self.bpause = False
+        if self.logger is not None:
+            self.logger.info("Restart Update thread")
 
     def __del__(self):
         self.cap.release()
@@ -94,8 +119,21 @@ if __name__ == "__main__":
     s = sys.argv[1]      # video file, webcam, rtsp stream.. etc
 
     medialoader = MediaLoader(s)
-    time.sleep(1)
+    medialoader.start()
+    while medialoader.is_frame_ready() is False:
+        time.sleep(0.01)
+        continue
+    print("-- MediaLoader is ready")
     _frame = medialoader.get_frame()
-    print(_frame.shape, _frame.dtype)
+    print("-- Frame Metadata:", _frame.shape, _frame.dtype)
+    t = time.time()
     while True:
-        medialoader.show_frame(wait_sec=1)
+        cur_t = time.time()
+        if 5 < cur_t - t < 10:
+            medialoader.pause()
+        else:
+            if medialoader.is_pause() is True:
+                medialoader.restart()
+            else:
+                medialoader.show_frame(wait_sec=1)
+        time.sleep(0.005)

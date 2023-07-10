@@ -16,6 +16,7 @@ from obj_detectors.models.yolo import check_img_size, letterbox, non_max_suppres
 from obj_detectors.models.torch_utils import select_device
 
 
+
 class YoloDetector(nn.Module):
     def __init__(self, weight='yolov5s.pt', device: int or str = "cpu", img_size=640, fp16=False, auto=True, fuse=True):
         super().__init__()
@@ -100,7 +101,7 @@ def attempt_load(weight, device=None, inplace=True, fuse=True):
 
 
 if __name__ == "__main__":
-    model = YoloDetector(weight='./weights/yolov5s6.pt', device=0, img_size=1280)
+    model = YoloDetector(weight='./weights/yolov5s.pt', device=0, img_size=640)
     model.warmup()
 
     import cv2

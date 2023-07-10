@@ -17,6 +17,7 @@ if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
 os.chdir(ROOT)
 
+from core.bbox import BBox
 from utils.config import _C as cfg, update_config
 from utils.logger import init_logger, get_logger
 from obj_detectors.obj_detector import ObjectDetector
@@ -97,6 +98,12 @@ class AnalysisThread(QThread):
             im = self.detector.preprocess(frame)
             _pred = self.detector.detect(im)
             _pred, _det = self.detector.postprocess(_pred)
+
+            # Create BBox Object & process tracking
+            bboxes = [BBox(tlbr=(_d[0], _d[1], _d[2], _d[3]), class_name=self.detector.names[_d[5]],
+                           conf=_d[4], imgsz=frame.shape[:2])
+                      for _d in _det]
+
             for d in _det:
                 x1, y1, x2, y2 = map(int, d[:4])
                 cv2.rectangle(frame, (x1, y1), (x2, y2), (96, 96, 216), thickness=2, lineType=cv2.LINE_AA)

@@ -31,9 +31,11 @@ class ObjectDetector(object):
             if ext in ['.pt', '.pth']:
                 from obj_detectors.yolov5_pt import YoloDetector
                 self.detector = YoloDetector(weight=weight, device=device, img_size=img_size, fp16=fp16)
+                self.names = self.detector.names
             elif ext == '.onnx':
                 from obj_detectors.yolov5_onnx import YoloOnnxDetector
                 self.detector = YoloOnnxDetector(weight=weight, device=device, img_size=img_size, fp16=fp16)
+                self.names = self.detector.names
 
             # warm up
             self.detector.warmup(imgsz=(1, 3, img_size, img_size))

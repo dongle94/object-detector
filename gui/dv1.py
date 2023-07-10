@@ -84,8 +84,10 @@ class AnalysisThread(QThread):
         self.stop = False
 
     def run(self):
+        get_logger().info("영상 분석 시작")
+        self.sbar.showMessage("영상 분석 시작")
+
         self.medialoader.restart()
-        self.sbar.showMessage("입력 영상 송출")
         self.stop = False
         while True:
             frame = self.medialoader.get_frame()
@@ -106,12 +108,13 @@ class AnalysisThread(QThread):
             time.sleep(0.005)
 
         # cv2.destroyAllWindows()
-        self.sbar.showMessage("입력 영상 종료")
+        self.sbar.showMessage("영상 분석 종료")
+        get_logger().info("영상 분석 종료")
 
 
 class ImageDialog(QDialog):
     def __init__(self, parent=None):
-        super().__init__()
+        super().__init__(parent=parent)
 
         layout = QVBoxLayout()
         self.img = QImage()
@@ -125,7 +128,6 @@ class ImageDialog(QDialog):
 
     def set_image(self, img):
         self.img_label.setPixmap(QPixmap.fromImage(img))
-
 
 
 class ProdTable(QTableWidget):
@@ -218,14 +220,12 @@ class MainWidget(QWidget):
         self.bottom = QHBoxLayout()
         self.bt_start = QPushButton("수량 학인 시작")
         self.bt_stop = QPushButton("수량 확인 종료")
-        # self.bt_show = QPushButton("실시간 영상 보기")
+
         self.bt_start.setDisabled(True)
         self.bt_stop.setDisabled(True)
-        # self.bt_show.setDisabled(True)
 
         self.bottom.addWidget(self.bt_start)
         self.bottom.addWidget(self.bt_stop)
-        # self.bottom.addWidget(self.bt_show)
 
         # show
         self.dialog = ImageDialog()
@@ -242,8 +242,9 @@ class MainWidget(QWidget):
 
         # Set Input Loader
         self.medialoader = self.parent().media_loader
-        self.medialoader.start()
-        self.medialoader.pause()
+        if self.medialoader is not None:
+            self.medialoader.start()
+            self.medialoader.pause()
 
         self.analysis_thread = AnalysisThread(parent=self,
                                               medialoader=self.medialoader,
@@ -286,10 +287,33 @@ class MainWidget(QWidget):
 
     @Slot()
     def start_analysis(self):
-        self.logger.info("Start analysis")
-        self.analysis_thread.start()
+        if self.medialoader:
+            self.logger.info("Start analysis")
+            self.analysis_thread.start()
 
-        self.dialog.show()
+            self.dialog.show()
+        else:
+            try:
+                logger = get_logger()
+                self.medialoader = MediaLoader(source="0", logger=logger)
+                self.medialoader.start()
+
+                self.analysis_thread.medialoader = self.medialoader
+                time.sleep(1)
+                self.logger.info("Start analysis")
+                self.analysis_thread.start()
+
+                self.dialog.show()
+            except Exception as e:
+                # Exception Camera Connection
+                self.logger.error(f"Camera is not Connected: {e}")
+                _dialog = QDialog(parent=self)
+                _alert = QWidget(self)
+                _layout = QHBoxLayout()
+                _label = QLabel("카메라가 연결되어 있지 않습니다.")
+                _layout.addWidget(_label)
+                _dialog.setLayout(_layout)
+                _dialog.show()
 
     @Slot()
     def stop_analysis(self):
@@ -327,7 +351,11 @@ class DaolCND(QMainWindow):
         # Get Object Detector
         self.config = config
         self.obj_detector = ObjectDetector(cfg=self.config)
-        self.media_loader = MediaLoader(source="0", logger=self.logger)
+        try:
+            self.media_loader = MediaLoader(source="0", logger=self.logger)
+        except Exception as e:
+            self.logger.warning(f"medialoader is None: {e}")
+            self.media_loader = None
 
         # Set Central Widget
         self.main_widget = MainWidget(self)

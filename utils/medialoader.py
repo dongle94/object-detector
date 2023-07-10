@@ -109,7 +109,8 @@ class MediaLoader(object):
             self.logger.info("Restart Update thread")
 
     def __del__(self):
-        self.cap.release()
+        if hasattr(self, 'cap'):
+            self.cap.release()
         cv2.destroyAllWindows()
 
 

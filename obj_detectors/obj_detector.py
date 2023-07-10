@@ -33,7 +33,7 @@ class ObjectDetector(object):
                 self.detector = YoloDetector(weight=weight, device=device, img_size=img_size, fp16=fp16)
             elif ext == '.onnx':
                 from obj_detectors.yolov5_onnx import YoloOnnxDetector
-                self.detector = YoloOnnxDetector(weight=weight, device=device, img_size=img_size)
+                self.detector = YoloOnnxDetector(weight=weight, device=device, img_size=img_size, fp16=fp16)
 
             # warm up
             self.detector.warmup(imgsz=(1, 3, img_size, img_size))
@@ -79,7 +79,12 @@ if __name__ == "__main__":
 
     s = sys.argv[1]
     media_loader = MediaLoader(s)
-    time.sleep(1)
+    media_loader.start()
+
+    while media_loader.is_frame_ready() is False:
+        time.sleep(0.01)
+        continue
+
     f_cnt = 0
     ts = [0., 0., 0.]
     while True:

@@ -15,8 +15,9 @@ os.chdir(ROOT)
 from obj_detectors.models.image_processing import letterbox, non_max_suppression, scale_boxes
 
 class YoloOnnxDetector(object):
-    def __init__(self, weight, device='cpu', img_size=640):
+    def __init__(self, weight, device='cpu', img_size=640, fp16=False):
         self.imgsz = img_size
+        self.fp16 = fp16
 
         # Execution Provider
         exec_provider = [
@@ -44,7 +45,7 @@ class YoloOnnxDetector(object):
             self.stride, self.names = int(self.meta['stride']), eval(self.meta['names'])
 
     def warmup(self, imgsz=(1, 3, 640, 640)):
-        _im = np.zeros(imgsz, dtype=np.float32)
+        _im = np.zeros(imgsz, dtype=np.float16 if self.fp16 else np.float32)
         self.infer(_im)
 
     def preprocess(self, img):
@@ -52,7 +53,7 @@ class YoloOnnxDetector(object):
 
         _img = _img.transpose((2, 0, 1))[::-1]
         _img = np.ascontiguousarray(_img)
-        _img = _img.astype(np.float32)
+        _img = _img.astype(np.float16) if self.fp16 else _img.astype(np.float32)
         _img /= 255.0
         if len(_img.shape) == 3:
             _img = np.expand_dims(_img, axis=0)

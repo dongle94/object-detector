@@ -80,7 +80,7 @@ if __name__ == "__main__":
     detector = ObjectDetector(cfg=cfg)
 
     s = sys.argv[1]
-    media_loader = MediaLoader(s)
+    media_loader = MediaLoader(s, realtime=True)
     media_loader.start()
 
     while media_loader.is_frame_ready() is False:

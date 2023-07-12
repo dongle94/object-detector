@@ -20,8 +20,9 @@ def check_sources(source):
 
 
 class MediaLoader(object):
-    def __init__(self, source, save_result=False, save_path="", stride=1, logger=None):
+    def __init__(self, source, stride=1, logger=None, realtime=True):
         self.stride = stride
+        self.realtime = realtime
         self.is_file, self.is_url, self.is_webcam = check_sources(source)
 
         source = os.path.abspath(source) if os.path.isfile(source) else source
@@ -42,7 +43,7 @@ class MediaLoader(object):
         self.fps = max((fps if math.isfinite(fps) else 0) % 100, 0) or 30  # 30 FPS fallback
         self.frame = max(int(cap.get(cv2.CAP_PROP_FRAME_COUNT)), 0) or float('inf')
 
-        _, self.imgs = cap.read()
+        _, self.img = cap.read()
 
         wait_ms = 1 / self.fps
         self.thread = Thread(target=self.update, args=([cap, source, wait_ms]), daemon=True)
@@ -57,9 +58,15 @@ class MediaLoader(object):
     def update(self, cap, stream, wait_ms=0.01):
         n, f = 0, self.frame
         while cap.isOpened() and n < f and self.alive:
+            # pause action
             if self.bpause is True:
-                time.sleep(0.01)
+                time.sleep(0.001)
                 continue
+            # if not realtime, process when img array is exist.
+            if self.realtime is False and self.img is not None:
+                time.sleep(0.001)
+                continue
+            # process
             n += 1
             cap.grab()
             if n % self.stride == 0:
@@ -70,15 +77,28 @@ class MediaLoader(object):
                     self.img = np.zeros_like(self.img)
                     cap.open(stream)
             time.sleep(wait_ms)
+        # break loop
         self.img = None
 
     def is_frame_ready(self):
         return True if self.img is not None else False
 
     def get_frame(self):
-        if self.img is None:
-            return None
+        # get frame
+        if self.realtime is False:
+            # if image array empty, wait for image
+            while self.img is None:
+                time.sleep(0.001)
+                continue
+        else:   # realtime is true
+            if self.img is None:
+                return None
         orig_im = self.img.copy()
+
+        # if not realtime, frame reset
+        if self.realtime is False:
+            self.img = None
+
         return orig_im
 
     def show_frame(self, wait_sec: int = 0):

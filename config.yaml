@@ -3,10 +3,15 @@ DEVICE: 0
 
 # Object Detector
 DET_MODEL_TYPE: "yolo"
-DET_MODEL_PATH: './weights/yolov5n.pt'
+DET_MODEL_PATH: './weights/yolov5s.pt'
 IMG_SIZE: 640
 HALF: false
 
+# Object Tracker
+TRACK_USE_ENCODER: false
+TRACK_MODEL_TYPE: "deepocsort"
+TRACK_MODEL_PATH: "./weights/osnet_x0_25_market1501.pt"
+TRACK_HALF: false
 
 # Logger
 LOG_LEVEL: 'INFO'

@@ -12,6 +12,12 @@ _C.DET_MODEL_TYPE = ""
 _C.DET_MODEL_PATH = ""
 _C.HALF = False
 
+# Object Tracker
+_C.TRACK_USE_ENCODER = True
+_C.TRACK_MODEL_TYPE = ""
+_C.TRACK_MODEL_PATH = ""
+_C.TRACK_HALF = False
+
 # Logger
 _C.LOG_LEVEL = 'DEBUG'
 _C.CONSOLE_LOG = False

@@ -8,6 +8,7 @@ from collections import OrderedDict, namedtuple
 from os.path import exists as file_exists
 
 from utils.logger import get_logger
+from ..utils.torch_utils import select_device
 
 from .reid_model_factory import (
     show_downloadable_models,
@@ -46,7 +47,7 @@ class ReIDDetectMultiBackend(nn.Module):
         self.fp16 &= self.pt or self.engine  # FP16
 
         # Build transform functions
-        self.device = device
+        self.device = select_device(device)
         self.image_size=(256, 128)
         self.pixel_mean=[0.485, 0.456, 0.406]
         self.pixel_std=[0.229, 0.224, 0.225]

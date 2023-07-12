@@ -234,7 +234,8 @@ class KalmanBoxTracker(object):
         self.emb /= np.linalg.norm(self.emb)
 
     def get_emb(self):
-        return self.emb.cpu()
+        ret = self.emb.cpu() if isinstance(self.emb, torch.Tensor) else self.emb
+        return ret
 
     def apply_affine_correction(self, affine):
         m = affine[:, :2]
@@ -348,7 +349,10 @@ class DeepOCSort(object):
         self.aw_param = aw_param
         KalmanBoxTracker.count = 0
 
-        self.embedder = ReIDDetectMultiBackend(weights=model_weights, device=device, fp16=fp16)
+        if embedding_off is False:
+            self.embedder = ReIDDetectMultiBackend(weights=model_weights, device=device, fp16=fp16)
+        else:       # embedding_off is True
+            self.embedder = None
         self.cmc = CameraMotionCompensation()
         self.embedding_off = embedding_off
         self.cmc_off = cmc_off
@@ -367,7 +371,7 @@ class DeepOCSort(object):
         assert isinstance(dets, np.ndarray), f"Unsupported 'dets' input format '{type(dets)}', valid format is np.ndarray"
         assert isinstance(img, np.ndarray), f"Unsupported 'img' input format '{type(img)}', valid format is np.ndarray"
         assert len(dets.shape) == 2, f"Unsupported 'dets' dimensions, valid number of dimensions is two"
-        assert dets.shape[1] == 6, f"Unsupported 'dets' 2nd dimension lenght, valid lenghts is 6"
+        assert dets.shape[1] == 6, f"Unsupported 'dets' 2nd dimension length, valid lengths is 6"
 
         xyxys = dets[:, 0:4]
         scores = dets[:, 4]
@@ -662,4 +666,5 @@ class DeepOCSort(object):
 
     def dump_cache(self):
         self.cmc.dump_cache()
-        self.embedder.dump_cache()
+        if self.embedder is not None:
+            self.embedder.dump_cache()

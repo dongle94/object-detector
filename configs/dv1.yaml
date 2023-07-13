@@ -7,6 +7,11 @@ DET_MODEL_PATH: './weights/yolov5s6.pt'
 IMG_SIZE: 1280
 HALF: false
 
+# Object Tracker
+TRACK_USE_ENCODER: true
+TRACK_MODEL_TYPE: "deepocsort"
+TRACK_MODEL_PATH: "./weights/osnet_x0_25_market1501.pt"
+TRACK_HALF: false
 
 # Logger
 LOG_LEVEL: 'info'

@@ -4,7 +4,7 @@ import argparse
 import time
 import cv2
 import numpy as np
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QDialog
 from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QTableWidget, QLineEdit, QLabel, QPushButton, QTableWidgetItem
@@ -96,6 +96,8 @@ class AnalysisThread(QThread):
         # analysis logging
         self.f_cnt = 0
         self.ts = [0., 0., 0.,]
+        self.class_cnt = defaultdict(int)
+        self.id_cnt = defaultdict(int)
 
     def run(self):
         self.logger.info("영상 분석 쓰레드 시작")
@@ -107,7 +109,7 @@ class AnalysisThread(QThread):
         # detection filter area set
         f = self.medialoader.wait_frame()
         img_h, img_w = f.shape[:2]
-        filter_ratio = 0.2
+        filter_ratio = 0.25
         filter_x1, filter_y1 = int(img_w * filter_ratio), int(img_h * filter_ratio)
         filter_x2, filter_y2 = int(img_w * (1 - filter_ratio)), int(img_h * (1 - filter_ratio))
 
@@ -127,7 +129,8 @@ class AnalysisThread(QThread):
             for _d in _det:
                 if filter_x1 < (_d[0] + _d[2]) / 2 < filter_x2 and filter_y1 < (_d[1] + _d[3]) / 2 < filter_y2:
                     _dets.append(_d)
-                    _boxes.append(BBox(tlbr=_d[:4], class_name=self.detector.names[_d[5]], conf=_d[4], imgsz=frame.shape))
+                    _boxes.append(BBox(tlbr=_d[:4], class_index=int(_d[5]),
+                                       class_name=self.detector.names[_d[5]], conf=_d[4], imgsz=frame.shape))
             _det = np.array(_dets)
             t1 = time.time()
 
@@ -143,11 +146,28 @@ class AnalysisThread(QThread):
                         _boxes[i].tracking_id = _id
             t2 = time.time()
 
+            for _box in _boxes:
+                t_id = _box.tracking_id
+                if t_id != -1:
+                    self.id_cnt[t_id] += 1
+                    if self.id_cnt[t_id] == 5:
+                        self.class_cnt[_box.class_idx] += 1
+
             # visualize
+            if filter_ratio != 0:
+                cv2.rectangle(frame, (filter_x1, filter_y1), (filter_x2, filter_y2),
+                              color=(96, 216, 96),
+                              thickness=2, lineType=cv2.LINE_AA)
+
             for b in _boxes:
-                cv2.rectangle(frame, (b.x1, b.y1), (b.x2, b.y2), (96, 96, 216), thickness=2, lineType=cv2.LINE_AA)
-                cv2.putText(frame, f"ID: {b.tracking_id}", (b.x1, b.y1 + 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (216, 96, 96), 2)
+                if b.tracking_id != -1:
+                    cv2.rectangle(frame, (b.x1, b.y1), (b.x2, b.y2), (96, 96, 216), thickness=2, lineType=cv2.LINE_AA)
+                    cv2.putText(frame, f"({b.class_name})ID: {b.tracking_id}", (b.x1, b.y1 + 10),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (216, 96, 96), 2)
+
+            for i, (k, v) in enumerate(self.class_cnt.items()):
+                cv2.putText(frame, f"{k}({self.detector.names[k]}): {v}", (img_w - 150, 30 + i * 30),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (32, 32, 32), 2)
 
             img = QImage(frame.data, frame.shape[1], frame.shape[0], QImage.Format.Format_BGR888)
             self.viewer.set_image(img)

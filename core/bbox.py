@@ -1,7 +1,8 @@
 
 
 class BBox(object):
-    def __init__(self, tlbr=None, tlwh=None, rel=False, class_name="", conf=0., imgsz=None):
+    def __init__(self, tlbr=None, tlwh=None, rel=False, class_index=-1, class_name="", conf=0., imgsz=None):
+        self.class_idx = class_index
         self.class_name = class_name
         self.confidence = conf
         self.img_h, self.img_w = imgsz[0], imgsz[1]

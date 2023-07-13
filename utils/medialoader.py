@@ -111,7 +111,7 @@ class MediaLoader(object):
 
     def wait_frame(self):
         frame = None
-        while frame is not None:
+        while frame is None:
             frame = self.get_frame()
         return frame
 

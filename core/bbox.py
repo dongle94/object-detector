@@ -9,11 +9,11 @@ class BBox(object):
 
         if rel is False:     # 절대좌표
             if tlbr is not None:
-                self.x1, self.y1, self.x2, self.y2 = tlbr
+                self.x1, self.y1, self.x2, self.y2 = map(int, tlbr)
                 self.w = self.x2 - self.x1
                 self.h = self.y2 - self.y1
             elif tlwh is not None:
-                self.x1, self.y1, self.w, self.h = tlwh
+                self.x1, self.y1, self.w, self.h = map(int, tlwh)
                 self.x2 = self.x1 + self.w
                 self.y2 = self.y1 + self.h
         else:       # 상대좌표

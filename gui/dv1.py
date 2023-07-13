@@ -3,6 +3,7 @@ import sys
 import argparse
 import time
 import cv2
+import numpy as np
 from collections import OrderedDict
 
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QDialog
@@ -20,8 +21,12 @@ os.chdir(ROOT)
 from core.bbox import BBox
 from utils.config import _C as cfg, update_config
 from utils.logger import init_logger, get_logger
-from obj_detectors.obj_detector import ObjectDetector
+
+from obj_detectors import ObjectDetector
+from tracking import ObjectTracker
 from utils.medialoader import MediaLoader
+
+from gui.image import ImgDialog
 
 
 ROW = OrderedDict({"chicken": "닭고기류",
@@ -75,66 +80,97 @@ PROD = [
 
 
 class AnalysisThread(QThread):
-    def __init__(self, parent=None, medialoader=None, statusbar=None, detector=None, img_viewer=None):
+    def __init__(self, parent=None, medialoader=None, statusbar=None, detector=None, tracker=None, img_viewer=None,
+                 logger=None):
         super().__init__(parent=parent)
         self.medialoader = medialoader if medialoader is not None else self.parent().medialoader
         self.sbar = statusbar if statusbar is not None else self.parent().sbar
-        self.detector = detector
-        self.viewer = img_viewer
+        self.detector = detector if detector else self.parent().obj_detector
+        self.tracker = tracker if tracker else self.parent().obj_tracker
+        self.viewer = img_viewer if img_viewer else self.parent().live_viewer
+
+        self.logger = logger if logger is not None else get_logger()
 
         self.stop = False
 
+        # analysis logging
+        self.f_cnt = 0
+        self.ts = [0., 0., 0.,]
+
     def run(self):
-        get_logger().info("영상 분석 시작")
+        self.logger.info("영상 분석 쓰레드 시작")
         self.sbar.showMessage("영상 분석 시작")
 
         self.medialoader.restart()
         self.stop = False
+
+        # detection filter area set
+        f = self.medialoader.wait_frame()
+        img_h, img_w = f.shape[:2]
+        filter_ratio = 0.2
+        filter_x1, filter_y1 = int(img_w * filter_ratio), int(img_h * filter_ratio)
+        filter_x2, filter_y2 = int(img_w * (1 - filter_ratio)), int(img_h * (1 - filter_ratio))
+
         while True:
             frame = self.medialoader.get_frame()
             if frame is None or self.stop is True:
                 break
 
+            t0 = time.time()
             im = self.detector.preprocess(frame)
             _pred = self.detector.detect(im)
             _pred, _det = self.detector.postprocess(_pred)
 
-            # Create BBox Object & process tracking
-            bboxes = [BBox(tlbr=(_d[0], _d[1], _d[2], _d[3]), class_name=self.detector.names[_d[5]],
-                           conf=_d[4], imgsz=frame.shape[:2])
-                      for _d in _det]
+            # box filtering
+            _dets = []
+            _boxes = []
+            for _d in _det:
+                if filter_x1 < (_d[0] + _d[2]) / 2 < filter_x2 and filter_y1 < (_d[1] + _d[3]) / 2 < filter_y2:
+                    _dets.append(_d)
+                    _boxes.append(BBox(tlbr=_d[:4], class_name=self.detector.names[_d[5]], conf=_d[4], imgsz=frame.shape))
+            _det = np.array(_dets)
+            t1 = time.time()
 
-            for d in _det:
-                x1, y1, x2, y2 = map(int, d[:4])
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (96, 96, 216), thickness=2, lineType=cv2.LINE_AA)
+            # tracking update
+            if len(_det):
+                track_ret = self.tracker.update(_det, frame)
+                if len(track_ret):
+                    t_boxes = track_ret[:, 0:4].astype(np.int32)
+                    t_ids = track_ret[:, 4].astype(np.int32)
+                    t_confs = track_ret[:, 5]
+                    t_classes = track_ret[:, 6]
+                    for i, (xyxy, _id, conf, cls) in enumerate(zip(t_boxes, t_ids, t_confs, t_classes)):
+                        _boxes[i].tracking_id = _id
+            t2 = time.time()
 
-            # cv2.imshow("input", frame)
+            # visualize
+            for b in _boxes:
+                cv2.rectangle(frame, (b.x1, b.y1), (b.x2, b.y2), (96, 96, 216), thickness=2, lineType=cv2.LINE_AA)
+                cv2.putText(frame, f"ID: {b.tracking_id}", (b.x1, b.y1 + 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (216, 96, 96), 2)
+
             img = QImage(frame.data, frame.shape[1], frame.shape[0], QImage.Format.Format_BGR888)
             self.viewer.set_image(img)
+            t3 = time.time()
 
-            time.sleep(0.005)
+            # calculate time
+            self.ts[0] += (t1 - t0)
+            self.ts[1] += (t2 - t1)
+            self.ts[2] += (t3 - t2)
+
+            # logging
+            self.f_cnt += 1
+            if self.f_cnt % 10 == 0:
+                self.logger.debug(
+                    f"[{self.f_cnt} Frame] det: {self.ts[0] / self.f_cnt:.4f} / "
+                    f"tracking: {self.ts[1] / self.f_cnt:.4f} / "
+                    f"visualize: {self.ts[2] / self.f_cnt:.4f}")
+
+            time.sleep(0.001)
 
         # cv2.destroyAllWindows()
         self.sbar.showMessage("영상 분석 종료")
         get_logger().info("영상 분석 종료")
-
-
-class ImageDialog(QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent=parent)
-
-        layout = QVBoxLayout()
-        self.img = QImage()
-
-        self.img_label = QLabel()
-        layout.addWidget(self.img_label)
-
-        self.setLayout(layout)
-        self.setWindowTitle("분석화면")
-        self.setWindowModality(Qt.WindowModality.NonModal)
-
-    def set_image(self, img):
-        self.img_label.setPixmap(QPixmap.fromImage(img))
 
 
 class ProdTable(QTableWidget):
@@ -196,12 +232,14 @@ class ProdTable(QTableWidget):
 
 
 class MainWidget(QWidget):
-    def __init__(self, parent):
+    def __init__(self, cfg, parent=None):
         super().__init__(parent=parent)
 
         # init MainWidget
+        self.config = cfg
         self.logger = get_logger()
         self.logger.info("Create Main QWidget - start")
+        self.sbar = self.parent().statusBar()
 
         # top - layout
         self.top = QHBoxLayout()
@@ -234,9 +272,6 @@ class MainWidget(QWidget):
         self.bottom.addWidget(self.bt_start)
         self.bottom.addWidget(self.bt_stop)
 
-        # show
-        self.dialog = ImageDialog()
-
         # Main Widget
         self.main_layout = QVBoxLayout()
         self.setLayout(self.main_layout)
@@ -244,31 +279,34 @@ class MainWidget(QWidget):
         self.main_layout.addWidget(self.middle)
         self.main_layout.addLayout(self.bottom)
 
-        # Status bar
-        self.sbar = self.parent().statusBar()
+        # analysis image
+        self.live_viewer = ImgDialog(parent=self, title="제품분석 - 실시간화면")
 
         # Set Input Loader
-        self.medialoader = self.parent().media_loader
-        if self.medialoader is not None:
+        try:
+            self.medialoader = MediaLoader(source="0", logger=self.logger)
             self.medialoader.start()
             self.medialoader.pause()
-
+        except Exception as e:
+            self.logger.error(f"Medialoader can't create: {e}")
+            self.medialoader = None
+        self.obj_detector = ObjectDetector(cfg=cfg)
+        self.obj_tracker = ObjectTracker(cfg=cfg)
         self.analysis_thread = AnalysisThread(parent=self,
                                               medialoader=self.medialoader,
                                               statusbar=self.sbar,
-                                              detector=self.parent().obj_detector,
-                                              img_viewer=self.dialog)
+                                              detector=self.obj_detector,
+                                              tracker=self.obj_tracker,
+                                              img_viewer=self.live_viewer)
 
         # signals & slots
         self.bt_search.clicked.connect(self.set_table)
         self.bt_reset.clicked.connect(self.clear_table)
         self.bt_start.clicked.connect(self.start_analysis)
         self.bt_stop.clicked.connect(self.stop_analysis)
-        # self.bt_show.clicked.connect(self.show_analysis)
 
         self.sbar.showMessage("프로그램 준비 완료")
         self.logger.info("Create Main QWidget - end")
-
 
     @Slot()
     def set_table(self):
@@ -295,40 +333,40 @@ class MainWidget(QWidget):
     @Slot()
     def start_analysis(self):
         if self.medialoader:
-            self.logger.info("Start analysis")
+            self.logger.info("MainWidget - Start analysis")
             self.analysis_thread.start()
 
-            self.dialog.show()
+            self.live_viewer.show()
         else:
             try:
-                logger = get_logger()
-                self.medialoader = MediaLoader(source="0", logger=logger)
+                self.medialoader = MediaLoader(source="0", logger=self.logger)
                 self.medialoader.start()
 
                 self.analysis_thread.medialoader = self.medialoader
                 time.sleep(1)
-                self.logger.info("Start analysis")
+                self.logger.info("Medialoader is None and recreate, Start analysis")
                 self.analysis_thread.start()
 
-                self.dialog.show()
+                self.live_viewer.show()
             except Exception as e:
                 # Exception Camera Connection
                 self.logger.error(f"Camera is not Connected: {e}")
                 _dialog = QDialog(parent=self)
                 _alert = QWidget(self)
                 _layout = QHBoxLayout()
-                _label = QLabel("카메라가 연결되어 있지 않습니다.")
+                _label = QLabel("카메라가 연결되어 있지 않습니다. 연결을 확인해주세요.")
                 _layout.addWidget(_label)
                 _dialog.setLayout(_layout)
+                _dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
                 _dialog.show()
 
     @Slot()
     def stop_analysis(self):
-        self.logger.info("Stop analysis")
+        self.logger.info("MainWidget - Stop analysis")
         self.analysis_thread.stop = True
         self.analysis_thread.exit()
 
-        self.dialog.close()
+        self.live_viewer.hide()
 
 
 class DaolCND(QMainWindow):
@@ -353,19 +391,11 @@ class DaolCND(QMainWindow):
         self.file_menu.addAction(exit_action)
 
         # Status Bar
-        self.statusBar().showMessage("프로그램 준비 시작", 0)
-
-        # Get Object Detector
-        self.config = config
-        self.obj_detector = ObjectDetector(cfg=self.config)
-        try:
-            self.media_loader = MediaLoader(source="0", logger=self.logger)
-        except Exception as e:
-            self.logger.warning(f"medialoader is None: {e}")
-            self.media_loader = None
+        self.sbar = self.statusBar()
+        self.sbar.showMessage("프로그램 준비 시작", 0)
 
         # Set Central Widget
-        self.main_widget = MainWidget(self)
+        self.main_widget = MainWidget(cfg=config, parent=self)
         self.setCentralWidget(self.main_widget)
 
         self.logger.info("Init DaolCND QMainWindow - end")

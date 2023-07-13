@@ -109,6 +109,12 @@ class MediaLoader(object):
                self.logger.info("-- Quit Show frames")
             raise StopIteration
 
+    def wait_frame(self):
+        frame = None
+        while frame is not None:
+            frame = self.get_frame()
+        return frame
+
     def stop(self):
         self.alive = False
         if self.logger is not None:

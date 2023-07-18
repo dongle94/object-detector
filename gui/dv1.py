@@ -7,7 +7,8 @@ import numpy as np
 from collections import OrderedDict, defaultdict
 
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QDialog
-from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QTableWidget, QLineEdit, QLabel, QPushButton, QTableWidgetItem
+from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QTableWidget, QLineEdit, QLabel, QPushButton, QTableWidgetItem,\
+    QCheckBox
 from PySide6.QtGui import QAction, QImage, QPixmap, QBrush, QColor
 from PySide6.QtCore import Qt, QSize, Slot, QThread
 
@@ -392,6 +393,7 @@ class MainWidget(QWidget):
         self.el_prod_name = QLineEdit()
         self.bt_search = QPushButton("발주 조회")
         self.bt_reset = QPushButton("초기화")
+        self.ck_liveView = QCheckBox("실시간 화면", self)
 
         self.top.addWidget(QLabel("날짜:"))
         self.top.addWidget(self.el_date)
@@ -401,6 +403,7 @@ class MainWidget(QWidget):
         self.top.addWidget(self.el_prod_name)
         self.top.addWidget(self.bt_search)
         self.top.addWidget(self.bt_reset)
+        self.top.addWidget(self.ck_liveView)
 
         # middle - table
         self.middle = ProdTable(col=PROD, row=ROW)
@@ -466,6 +469,8 @@ class MainWidget(QWidget):
                                               img_viewer=self.live_viewer)
 
         self.lb_over.setText("분석 결과:")
+        # 일치여부 표시
+        self.middle.init_result()
 
         self.bt_search.setDisabled(True)
         self.bt_start.setDisabled(False)
@@ -495,10 +500,8 @@ class MainWidget(QWidget):
             self.analysis_thread.start()
 
             # 실시간 화면 표시
-            self.live_viewer.show()
-
-            # 일치여부 표시
-            self.middle.init_result()
+            if self.ck_liveView.isChecked():
+                self.live_viewer.show()
         else:
             try:
                 self.medialoader = MediaLoader(source="0", logger=self.logger)
@@ -510,11 +513,8 @@ class MainWidget(QWidget):
                 self.analysis_thread.start()
 
                 # 실시간 화면 표시
-                self.live_viewer.show()
-
-                # 일치여부 표시
-                self.middle.init_result()
-
+                if self.ck_liveView.isChecked():
+                    self.live_viewer.show()
             except Exception as e:
                 # Exception Camera Connection
                 self.logger.error(f"Camera is not Connected: {e}")

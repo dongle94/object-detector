@@ -63,7 +63,7 @@ PROD = [
     {
         "name": "공주매콤 닭갈비",
         "chicken": ["태음융융소금염지닭", 50],
-        "sauce1": ["닭갈비 간장양념", 50],
+        "sauce1": ["닭갈비간장", 50],
         "sauce2": [],
         "powder": [],
         "quantity": 50,
@@ -77,6 +77,37 @@ PROD = [
         "powder": ["크리스피파우더", 50]
     },
 ]
+
+PROD_CLASS = {
+    "태음융융소금염지닭": 0,
+    "후라이드염지닭": 1,
+    "핫커리염지닭": 2,
+    "닭갈비간장": 3,
+    "갈비레이": 4,
+    "치밥버무림소스": 5,
+    "치밥벌크소스": 6,
+    "소이퐁소스": 7,
+    "맛있게매운소스": 8,
+    "프리마늘소스": 9,
+    "에어크런치": 10,
+    "크리스피파우더": 11,
+    "우리쌀 후레이크파우더": 12,
+}
+
+
+def getClassNumberDict(cls_tbl, prod_tbl, column: list):
+    gt_table = defaultdict(int)
+    for prod in prod_tbl:
+        for c in column:
+            if prod[c]:
+                gt_table[cls_tbl[prod[c][0]]] += prod[c][1]
+    return gt_table
+
+
+def getKeybyValue(cls_dict, idx):
+    for k, v in cls_dict.items():
+        if v == idx:
+            return k
 
 
 class AnalysisThread(QThread):
@@ -98,6 +129,10 @@ class AnalysisThread(QThread):
         self.ts = [0., 0., 0.,]
         self.class_cnt = defaultdict(int)
         self.id_cnt = defaultdict(int)
+
+        self.table_widget = self.parent().middle
+        self.gt_cls_num = self.table_widget.gt_cls_num
+        self.prod_loc = self.table_widget.content_loc
 
     def run(self):
         self.logger.info("영상 분석 쓰레드 시작")
@@ -153,6 +188,8 @@ class AnalysisThread(QThread):
                     if self.id_cnt[t_id] == 5:
                         self.class_cnt[_box.class_idx] += 1
 
+                        self.edit_prod_num(_box.class_idx)
+
             # visualize
             if filter_ratio != 0:
                 cv2.rectangle(frame, (filter_x1, filter_y1), (filter_x2, filter_y2),
@@ -192,6 +229,23 @@ class AnalysisThread(QThread):
         self.sbar.showMessage("영상 분석 종료")
         get_logger().info("영상 분석 종료")
 
+    def edit_prod_num(self, class_idx):
+        prod_cls = class_idx
+        prod_name = getKeybyValue(PROD_CLASS, prod_cls)
+
+        if prod_name in self.prod_loc:
+            for p_loc in self.prod_loc[prod_name]:
+                gt_num = int(self.table_widget.item(p_loc[0], p_loc[1]-1).text())
+                prod_num = int(self.table_widget.item(p_loc[0], p_loc[1]).text())
+
+                # 제품 갯수 수정
+                if gt_num >= prod_num:
+                    prod_num += 1
+                    self.table_widget.item(p_loc[0], p_loc[1]).setText(str(prod_num))
+                    break
+        else:
+            print(prod_name, prod_cls, "제품리스트에 없음")
+
 
 class ProdTable(QTableWidget):
     def __init__(self, col, row):
@@ -199,6 +253,17 @@ class ProdTable(QTableWidget):
         self.col = col
         self.row = row
 
+        self.gt_cls_num = getClassNumberDict(PROD_CLASS, prod_tbl=col, column=list(row.keys())[:4])
+
+        self.content_loc = {}
+        for c, col in enumerate(self.col):
+            for r, k in enumerate(list(self.row.keys())[:4]):
+                if col[k]:
+                    # 집계 물량 테이블 좌표 저장
+                    if col[k][0] in list(self.content_loc.keys()):
+                        self.content_loc[col[k][0]].append((r+1, 3*c+2, col[k][1]))
+                    else:
+                        self.content_loc[col[k][0]] = [(r+1, 3*c+2, col[k][1])]
 
     def set_header(self):
         # Set vertical header

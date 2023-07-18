@@ -5,6 +5,7 @@ import argparse
 import time
 
 import numpy as np
+from tqdm import tqdm
 
 
 def mosaic(img: np.ndarray, coord, block=10):
@@ -50,7 +51,7 @@ def process_mosaic(opt):
     # 이미지 읽으면서
     f_cnt = 0
     st = time.time()
-    for inp in inps:
+    for inp in tqdm(inps, "Processing image mosaic"):
         img = dlib.load_rgb_image(inp)
         if len(img.shape) == 3:
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)

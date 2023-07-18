@@ -251,7 +251,7 @@ class AnalysisThread(QThread):
                     is_accept = True
 
                     # 일치여부 확인 및 갱신
-
+                    self.table_widget.check_matching(p_loc[1] // 3)
                     break
 
             # 어떤 항목에도 갯수 수정을 하지 못함 -> 초과수량
@@ -347,6 +347,22 @@ class ProdTable(QTableWidget):
                 item.setForeground(QBrush(QColor(255, 0, 0)))
                 item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.setItem(r-1, idx, item)
+
+    def check_matching(self, p_num):
+        for r in range(1, self.rowCount()):
+            gt_num = self.item(r, p_num * 3 + 1)
+            if gt_num is not None:
+                gt_num = gt_num.text()
+                prod_num = self.item(r, p_num * 3 + 2).text()
+
+                if gt_num != prod_num:
+                    return
+
+        # matching True
+        item = QTableWidgetItem("일치")
+        item.setForeground(QBrush(QColor(0, 0, 255)))
+        item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setItem(self.rowCount()-1, p_num * 3, item)
 
 
 class MainWidget(QWidget):

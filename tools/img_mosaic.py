@@ -5,6 +5,7 @@ import argparse
 import time
 
 import numpy as np
+from tqdm import tqdm
 
 
 def mosaic(img: np.ndarray, coord, block=10):
@@ -41,7 +42,8 @@ def process_mosaic(opt):
         inps = [os.path.abspath(inps)]
     elif is_dir:
         files = os.listdir(inps)
-        inps = [os.path.abspath(os.path.join(inps, f))for f in files]
+        inps = [os.path.abspath(os.path.join(inps, f)) for f in files
+                if os.path.isfile(os.path.abspath(os.path.join(inps, f)))]
     else:
         print("There is no image files")
         return
@@ -49,7 +51,7 @@ def process_mosaic(opt):
     # 이미지 읽으면서
     f_cnt = 0
     st = time.time()
-    for inp in inps:
+    for inp in tqdm(inps, "Processing image mosaic"):
         img = dlib.load_rgb_image(inp)
         if len(img.shape) == 3:
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -57,7 +59,12 @@ def process_mosaic(opt):
             img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
 
         # 얼굴인식
-        det = detector(img, 2)
+        upsample = 0
+        if img.shape[0] * img.shape[1] < 640 * 480:
+            upsample = 2
+        elif img.shape[0] * img.shape[1] < 1280 * 720:
+            upsample = 1
+        det = detector(img, upsample)
         for d in det:
             d = d.rect
             x1, y1, x2, y2 = d.left(), d.top(), d.right(), d.bottom()
@@ -73,7 +80,8 @@ def process_mosaic(opt):
         if save_dir:
             cv2.imwrite(os.path.join(save_dir, os.path.basename(inp)), img)
     et = time.time()
-    print(f"{f_cnt} images spend {(et - st) / f_cnt:.4f} sec.")
+    if f_cnt:
+        print(f"{f_cnt} images spend {(et - st) / f_cnt:.4f} sec.")
 
 
 def args_parse():

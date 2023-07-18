@@ -8,7 +8,7 @@ from collections import OrderedDict, defaultdict
 
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QDialog
 from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QTableWidget, QLineEdit, QLabel, QPushButton, QTableWidgetItem
-from PySide6.QtGui import QAction, QImage, QPixmap
+from PySide6.QtGui import QAction, QImage, QPixmap, QBrush, QColor
 from PySide6.QtCore import Qt, QSize, Slot, QThread
 
 from pathlib import Path
@@ -134,6 +134,8 @@ class AnalysisThread(QThread):
         self.gt_cls_num = self.table_widget.gt_cls_num
         self.prod_loc = self.table_widget.content_loc
 
+        self.over_cnt = defaultdict(int)
+
     def run(self):
         self.logger.info("영상 분석 쓰레드 시작")
         self.sbar.showMessage("영상 분석 시작")
@@ -234,15 +236,33 @@ class AnalysisThread(QThread):
         prod_name = getKeybyValue(PROD_CLASS, prod_cls)
 
         if prod_name in self.prod_loc:
+            is_accept = False
             for p_loc in self.prod_loc[prod_name]:
                 gt_num = int(self.table_widget.item(p_loc[0], p_loc[1]-1).text())
                 prod_num = int(self.table_widget.item(p_loc[0], p_loc[1]).text())
 
                 # 제품 갯수 수정
-                if gt_num >= prod_num:
+                if gt_num > prod_num:
                     prod_num += 1
-                    self.table_widget.item(p_loc[0], p_loc[1]).setText(str(prod_num))
+                    item = self.table_widget.item(p_loc[0], p_loc[1])
+                    item.setText(str(prod_num))
+                    if prod_num == gt_num:      # 목표 수량 도달
+                        item.setForeground(QBrush(QColor(0, 0, 255)))
+                    is_accept = True
+
+                    # 일치여부 확인 및 갱신
+
                     break
+
+            # 어떤 항목에도 갯수 수정을 하지 못함 -> 초과수량
+            if is_accept is False:
+                self.over_cnt[prod_name] += 1
+                t = "초과 수량: "
+                for k, v in self.over_cnt.items():
+                    t += f"{k} - {v}EA, "
+                self.parent().lb_over.setText(t)
+
+
         else:
             print(prod_name, prod_cls, "제품리스트에 없음")
 
@@ -297,7 +317,10 @@ class ProdTable(QTableWidget):
                 if col[k]:
                     self.setItem(r + 1, 3 * c, QTableWidgetItem(col[k][0]))
                     self.setItem(r + 1, 3 * c + 1, QTableWidgetItem(str(col[k][1])))
-                    self.setItem(r + 1, 3 * c + 2, QTableWidgetItem(str(0)))
+                    item = QTableWidgetItem(str(0))
+                    item.setForeground(QBrush(QColor(255, 0, 0)))
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                    self.setItem(r + 1, 3 * c + 2, item)
                 else:
                     self.setItem(r + 1, 3 * c, QTableWidgetItem("-"))
 
@@ -314,6 +337,16 @@ class ProdTable(QTableWidget):
         r_cnt = self.rowCount()
         for r in range(r_cnt):
             self.removeRow(r_cnt - r - 1)
+
+    def init_result(self):
+        r = self.rowCount()
+        c = self.columnCount()
+        for idx in range(c):
+            if c % 3 == 0:
+                item = QTableWidgetItem("불일치")
+                item.setForeground(QBrush(QColor(255, 0, 0)))
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.setItem(r-1, idx, item)
 
 
 class MainWidget(QWidget):
@@ -347,6 +380,9 @@ class MainWidget(QWidget):
         self.middle = ProdTable(col=PROD, row=ROW)
 
         # bottom - layout
+        self.prebotttom = QHBoxLayout()
+        self.lb_over = QLabel("초과 수량:", parent=self)
+        self.prebotttom.addWidget(self.lb_over)
         self.bottom = QHBoxLayout()
         self.bt_start = QPushButton("수량 학인 시작")
         self.bt_stop = QPushButton("수량 확인 종료")
@@ -362,6 +398,7 @@ class MainWidget(QWidget):
         self.setLayout(self.main_layout)
         self.main_layout.addLayout(self.top)
         self.main_layout.addWidget(self.middle)
+        self.main_layout.addLayout(self.prebotttom)
         self.main_layout.addLayout(self.bottom)
 
         # analysis image
@@ -421,7 +458,11 @@ class MainWidget(QWidget):
             self.logger.info("MainWidget - Start analysis")
             self.analysis_thread.start()
 
+            # 실시간 화면 표시
             self.live_viewer.show()
+
+            # 일치여부 표시
+            self.middle.init_result()
         else:
             try:
                 self.medialoader = MediaLoader(source="0", logger=self.logger)
@@ -432,7 +473,12 @@ class MainWidget(QWidget):
                 self.logger.info("Medialoader is None and recreate, Start analysis")
                 self.analysis_thread.start()
 
+                # 실시간 화면 표시
                 self.live_viewer.show()
+
+                # 일치여부 표시
+                self.middle.init_result()
+
             except Exception as e:
                 # Exception Camera Connection
                 self.logger.error(f"Camera is not Connected: {e}")

@@ -135,6 +135,7 @@ class AnalysisThread(QThread):
         self.prod_loc = self.table_widget.content_loc
 
         self.over_cnt = defaultdict(int)
+        self.less_cnt = defaultdict(int)
 
     def run(self):
         self.logger.info("영상 분석 쓰레드 시작")
@@ -262,7 +263,6 @@ class AnalysisThread(QThread):
                     t += f"{k} - {v}EA, "
                 self.parent().lb_over.setText(t)
 
-
         else:
             print(prod_name, prod_cls, "제품리스트에 없음")
 
@@ -364,6 +364,16 @@ class ProdTable(QTableWidget):
         item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setItem(self.rowCount()-1, p_num * 3, item)
 
+    def get_shortfall(self, cur_dict):
+        less_cnt = defaultdict(int)
+        for gk, gv in self.gt_cls_num.items():
+            if gk in cur_dict.keys():
+                if gv - cur_dict[gk] > 0:
+                    less_cnt[getKeybyValue(PROD_CLASS, gk)] = gv - cur_dict[gk]
+            else:
+                less_cnt[getKeybyValue(PROD_CLASS, gk)] = gv
+        return less_cnt
+
 
 class MainWidget(QWidget):
     def __init__(self, cfg, parent=None):
@@ -397,7 +407,7 @@ class MainWidget(QWidget):
 
         # bottom - layout
         self.prebotttom = QHBoxLayout()
-        self.lb_over = QLabel("초과 수량:", parent=self)
+        self.lb_over = QLabel("분석 결과:", parent=self)
         self.prebotttom.addWidget(self.lb_over)
         self.bottom = QHBoxLayout()
         self.bt_start = QPushButton("수량 학인 시작")
@@ -430,16 +440,11 @@ class MainWidget(QWidget):
             self.medialoader = None
         self.obj_detector = ObjectDetector(cfg=cfg)
         self.obj_tracker = ObjectTracker(cfg=cfg)
-        self.analysis_thread = AnalysisThread(parent=self,
-                                              medialoader=self.medialoader,
-                                              statusbar=self.sbar,
-                                              detector=self.obj_detector,
-                                              tracker=self.obj_tracker,
-                                              img_viewer=self.live_viewer)
+        self.analysis_thread = None
 
         # signals & slots
-        self.bt_search.clicked.connect(self.set_table)
-        self.bt_reset.clicked.connect(self.clear_table)
+        self.bt_search.clicked.connect(self.setUI)
+        self.bt_reset.clicked.connect(self.clearUI)
         self.bt_start.clicked.connect(self.start_analysis)
         self.bt_stop.clicked.connect(self.stop_analysis)
 
@@ -447,26 +452,41 @@ class MainWidget(QWidget):
         self.logger.info("Create Main QWidget - end")
 
     @Slot()
-    def set_table(self):
-        self.logger.info("set_table - start")
+    def setUI(self):
+        self.logger.info("setUI - start")
         self.middle.show_table()
 
+        if self.analysis_thread is not None:
+            del self.analysis_thread
+        self.analysis_thread = AnalysisThread(parent=self,
+                                              medialoader=self.medialoader,
+                                              statusbar=self.sbar,
+                                              detector=self.obj_detector,
+                                              tracker=self.obj_tracker,
+                                              img_viewer=self.live_viewer)
+
+        self.lb_over.setText("분석 결과:")
+
+        self.bt_search.setDisabled(True)
         self.bt_start.setDisabled(False)
         self.bt_stop.setDisabled(False)
-        # self.bt_show.setDisabled(False)
+
         self.sbar.showMessage("발주 내용 조회")
-        self.logger.info("set_table - end")
+        self.logger.info("setUI - end")
 
     @Slot()
-    def clear_table(self):
-        self.logger.info("clear_table - start")
+    def clearUI(self):
+        self.logger.info("clearUI - start")
         self.middle.clear_table()
 
+        self.lb_over.setText("분석 결과:")
+
+        self.bt_search.setDisabled(False)
         self.bt_start.setDisabled(True)
+        self.bt_start.setText("수량 확인 시작")
         self.bt_stop.setDisabled(True)
-        # self.bt_show.setDisabled(True)
-        self.sbar.showMessage("테이블 초기화")
-        self.logger.info("clear_table - end")
+        self.sbar.showMessage("시스템 초기화")
+        self.logger.info("clearUI - end")
 
     @Slot()
     def start_analysis(self):
@@ -510,10 +530,29 @@ class MainWidget(QWidget):
     @Slot()
     def stop_analysis(self):
         self.logger.info("MainWidget - Stop analysis")
+
+        self.bt_start.setText("수량 확인 재개")
+        
         self.analysis_thread.stop = True
         self.analysis_thread.exit()
 
         self.live_viewer.hide()
+
+        self.analysis_thread.less_cnt = self.middle.get_shortfall(self.analysis_thread.class_cnt)
+        self.show_result()
+
+    def show_result(self):
+        t = "초과 수량: "
+        for i, (k, v) in enumerate(self.analysis_thread.over_cnt.items()):
+            t += f"{k} - {v}EA, "
+            if (i + 1) % 6 == 0:
+                t += '\n'
+        t += "\n부족 수량: "
+        for i, (k, v) in enumerate(self.analysis_thread.less_cnt.items()):
+            t += f"{k} - {v}EA, "
+            if (i + 1) % 6 == 0:
+                t += '\n'
+        self.lb_over.setText(t)
 
 
 class DaolCND(QMainWindow):

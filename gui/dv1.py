@@ -435,7 +435,7 @@ class MainWidget(QWidget):
 
         # Set Input Loader
         try:
-            self.medialoader = MediaLoader(source="0", logger=self.logger)
+            self.medialoader = MediaLoader(source="0", logger=self.logger, opt=cfg)
             self.medialoader.start()
             self.medialoader.pause()
         except Exception as e:

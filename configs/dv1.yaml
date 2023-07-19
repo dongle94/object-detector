@@ -1,6 +1,13 @@
 # Environments
 DEVICE: 0
 
+# Media
+MEDIA_SOURCE: "0"
+MEDIA_OPT_AUTO: true
+MEDIA_WIDTH: 1280
+MEDIA_HEIGHT: 720
+MEDIA_FPS: 30
+
 # Object Detector
 DET_MODEL_TYPE: "yolo"
 DET_MODEL_PATH: './weights/yolov5s6.pt'

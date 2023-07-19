@@ -122,6 +122,7 @@ class AnalysisThread(QThread):
         self.viewer = img_viewer if img_viewer else self.parent().live_viewer
 
         self.logger = logger if logger is not None else get_logger()
+        self.log_interval = self.parent().config.CONSOLE_LOG_INTERVAL
 
         self.stop = False
 
@@ -193,25 +194,27 @@ class AnalysisThread(QThread):
                         self.class_cnt[_box.class_idx] += 1
 
                         self.edit_prod_num(_box.class_idx)
+                        self.logger.info(f"add 1 prod {_box.class_idx} - {getKeybyValue(PROD_CLASS, _box.class_idx)}")
 
             # visualize
-            if filter_ratio != 0:
-                cv2.rectangle(frame, (filter_x1, filter_y1), (filter_x2, filter_y2),
-                              color=(96, 216, 96),
-                              thickness=2, lineType=cv2.LINE_AA)
+            if self.parent().ck_liveView.isChecked():
+                if filter_ratio != 0:
+                    cv2.rectangle(frame, (filter_x1, filter_y1), (filter_x2, filter_y2),
+                                  color=(96, 216, 96),
+                                  thickness=2, lineType=cv2.LINE_AA)
 
-            for b in _boxes:
-                if b.tracking_id != -1:
-                    cv2.rectangle(frame, (b.x1, b.y1), (b.x2, b.y2), (96, 96, 216), thickness=2, lineType=cv2.LINE_AA)
-                    cv2.putText(frame, f"({b.class_name})ID: {b.tracking_id}", (b.x1, b.y1 + 10),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (216, 96, 96), 2)
+                for b in _boxes:
+                    if b.tracking_id != -1:
+                        cv2.rectangle(frame, (b.x1, b.y1), (b.x2, b.y2), (96, 96, 216), thickness=2, lineType=cv2.LINE_AA)
+                        cv2.putText(frame, f"({b.class_name})ID: {b.tracking_id}", (b.x1, b.y1 + 10),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (216, 96, 96), 2)
 
-            for i, (k, v) in enumerate(self.class_cnt.items()):
-                cv2.putText(frame, f"{k}({self.detector.names[k]}): {v}", (img_w - 150, 30 + i * 30),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (32, 32, 32), 2)
+                for i, (k, v) in enumerate(self.class_cnt.items()):
+                    cv2.putText(frame, f"{k}({self.detector.names[k]}): {v}", (img_w - 150, 30 + i * 30),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (32, 32, 32), 2)
 
-            img = QImage(frame.data, frame.shape[1], frame.shape[0], QImage.Format.Format_BGR888)
-            self.viewer.set_image(img)
+                img = QImage(frame.data, frame.shape[1], frame.shape[0], QImage.Format.Format_BGR888)
+                self.viewer.set_image(img)
             t3 = time.time()
 
             # calculate time
@@ -221,7 +224,7 @@ class AnalysisThread(QThread):
 
             # logging
             self.f_cnt += 1
-            if self.f_cnt % 10 == 0:
+            if self.f_cnt % self.log_interval == 0:
                 self.logger.debug(
                     f"[{self.f_cnt} Frame] det: {self.ts[0] / self.f_cnt:.4f} / "
                     f"tracking: {self.ts[1] / self.f_cnt:.4f} / "

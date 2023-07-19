@@ -13,6 +13,7 @@ DET_MODEL_TYPE: "yolo"
 DET_MODEL_PATH: './weights/yolov5s6.pt'
 IMG_SIZE: 1280
 HALF: false
+OBJ_CLASSES: None   # None or [0, 1, 2...]
 
 # Object Tracker
 TRACK_USE_ENCODER: true

@@ -18,6 +18,7 @@ _C.IMG_SIZE = 640
 _C.DET_MODEL_TYPE = ""
 _C.DET_MODEL_PATH = ""
 _C.HALF = False
+_C.OBJ_CLASSES = None
 
 # Object Tracker
 _C.TRACK_USE_ENCODER = True

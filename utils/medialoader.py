@@ -20,7 +20,7 @@ def check_sources(source):
 
 
 class MediaLoader(object):
-    def __init__(self, source, stride=1, logger=None, realtime=True):
+    def __init__(self, source, stride=1, logger=None, realtime=True, opt=None):
         self.stride = stride
         self.realtime = realtime
         self.is_file, self.is_url, self.is_webcam = check_sources(source)
@@ -37,6 +37,10 @@ class MediaLoader(object):
 
         # Metadata
         self.cap = cap
+        if opt.MEDIA_OPT_AUTO is False:
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, opt.MEDIA_WIDTH)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, opt.MEDIA_HEIGHT)
+            cap.set(cv2.CAP_PROP_FPS, opt.MEDIA_FPS)
         self.w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         self.h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         fps = cap.get(cv2.CAP_PROP_FPS)
@@ -108,6 +112,12 @@ class MediaLoader(object):
             if self.logger is not None:
                self.logger.info("-- Quit Show frames")
             raise StopIteration
+
+    def wait_frame(self):
+        frame = None
+        while frame is None:
+            frame = self.get_frame()
+        return frame
 
     def stop(self):
         self.alive = False

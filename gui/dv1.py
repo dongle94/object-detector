@@ -3,11 +3,13 @@ import sys
 import argparse
 import time
 import cv2
-from collections import OrderedDict
+import numpy as np
+from collections import OrderedDict, defaultdict
 
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QDialog
-from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QTableWidget, QLineEdit, QLabel, QPushButton, QTableWidgetItem
-from PySide6.QtGui import QAction, QImage, QPixmap
+from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QTableWidget, QLineEdit, QLabel, QPushButton, QTableWidgetItem,\
+    QCheckBox
+from PySide6.QtGui import QAction, QImage, QPixmap, QBrush, QColor
 from PySide6.QtCore import Qt, QSize, Slot, QThread
 
 from pathlib import Path
@@ -20,8 +22,12 @@ os.chdir(ROOT)
 from core.bbox import BBox
 from utils.config import _C as cfg, update_config
 from utils.logger import init_logger, get_logger
-from obj_detectors.obj_detector import ObjectDetector
+
+from obj_detectors import ObjectDetector
+from tracking import ObjectTracker
 from utils.medialoader import MediaLoader
+
+from gui.image import ImgDialog
 
 
 ROW = OrderedDict({"chicken": "닭고기류",
@@ -58,7 +64,7 @@ PROD = [
     {
         "name": "공주매콤 닭갈비",
         "chicken": ["태음융융소금염지닭", 50],
-        "sauce1": ["닭갈비 간장양념", 50],
+        "sauce1": ["닭갈비간장", 50],
         "sauce2": [],
         "powder": [],
         "quantity": 50,
@@ -73,68 +79,196 @@ PROD = [
     },
 ]
 
+PROD_CLASS = {
+    "태음융융소금염지닭": 0,
+    "후라이드염지닭": 1,
+    "핫커리염지닭": 2,
+    "닭갈비간장": 3,
+    "갈비레이": 4,
+    "치밥버무림소스": 5,
+    "치밥벌크소스": 6,
+    "소이퐁소스": 7,
+    "맛있게매운소스": 8,
+    "프리마늘소스": 9,
+    "에어크런치": 10,
+    "크리스피파우더": 11,
+    "우리쌀 후레이크파우더": 12,
+}
+
+
+def getClassNumberDict(cls_tbl, prod_tbl, column: list):
+    gt_table = defaultdict(int)
+    for prod in prod_tbl:
+        for c in column:
+            if prod[c]:
+                gt_table[cls_tbl[prod[c][0]]] += prod[c][1]
+    return gt_table
+
+
+def getKeybyValue(cls_dict, idx):
+    for k, v in cls_dict.items():
+        if v == idx:
+            return k
+
 
 class AnalysisThread(QThread):
-    def __init__(self, parent=None, medialoader=None, statusbar=None, detector=None, img_viewer=None):
+    def __init__(self, parent=None, medialoader=None, statusbar=None, detector=None, tracker=None, img_viewer=None,
+                 logger=None):
         super().__init__(parent=parent)
         self.medialoader = medialoader if medialoader is not None else self.parent().medialoader
         self.sbar = statusbar if statusbar is not None else self.parent().sbar
-        self.detector = detector
-        self.viewer = img_viewer
+        self.detector = detector if detector else self.parent().obj_detector
+        self.tracker = tracker if tracker else self.parent().obj_tracker
+        self.viewer = img_viewer if img_viewer else self.parent().live_viewer
+
+        self.logger = logger if logger is not None else get_logger()
+        self.log_interval = self.parent().config.CONSOLE_LOG_INTERVAL
 
         self.stop = False
 
+        # analysis logging
+        self.f_cnt = 0
+        self.ts = [0., 0., 0.,]
+        self.class_cnt = defaultdict(int)
+        self.id_cnt = defaultdict(int)
+
+        self.table_widget = self.parent().middle
+        self.gt_cls_num = self.table_widget.gt_cls_num
+        self.prod_loc = self.table_widget.content_loc
+
+        self.over_cnt = defaultdict(int)
+        self.less_cnt = defaultdict(int)
+
     def run(self):
-        get_logger().info("영상 분석 시작")
+        self.logger.info("영상 분석 쓰레드 시작")
         self.sbar.showMessage("영상 분석 시작")
 
         self.medialoader.restart()
         self.stop = False
+
+        # detection filter area set
+        f = self.medialoader.wait_frame()
+        img_h, img_w = f.shape[:2]
+        filter_ratio = 0.25
+        filter_x1, filter_y1 = int(img_w * filter_ratio), int(img_h * filter_ratio)
+        filter_x2, filter_y2 = int(img_w * (1 - filter_ratio)), int(img_h * (1 - filter_ratio))
+
         while True:
             frame = self.medialoader.get_frame()
             if frame is None or self.stop is True:
                 break
 
+            t0 = time.time()
             im = self.detector.preprocess(frame)
             _pred = self.detector.detect(im)
             _pred, _det = self.detector.postprocess(_pred)
 
-            # Create BBox Object & process tracking
-            bboxes = [BBox(tlbr=(_d[0], _d[1], _d[2], _d[3]), class_name=self.detector.names[_d[5]],
-                           conf=_d[4], imgsz=frame.shape[:2])
-                      for _d in _det]
+            # box filtering
+            _dets = []
+            _boxes = []
+            for _d in _det:
+                if filter_x1 < (_d[0] + _d[2]) / 2 < filter_x2 and filter_y1 < (_d[1] + _d[3]) / 2 < filter_y2:
+                    _dets.append(_d)
+                    _boxes.append(BBox(tlbr=_d[:4], class_index=int(_d[5]),
+                                       class_name=self.detector.names[_d[5]], conf=_d[4], imgsz=frame.shape))
+            _det = np.array(_dets)
+            t1 = time.time()
 
-            for d in _det:
-                x1, y1, x2, y2 = map(int, d[:4])
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (96, 96, 216), thickness=2, lineType=cv2.LINE_AA)
+            # tracking update
+            if len(_det):
+                track_ret = self.tracker.update(_det, frame)
+                if len(track_ret):
+                    t_boxes = track_ret[:, 0:4].astype(np.int32)
+                    t_ids = track_ret[:, 4].astype(np.int32)
+                    t_confs = track_ret[:, 5]
+                    t_classes = track_ret[:, 6]
+                    for i, (xyxy, _id, conf, cls) in enumerate(zip(t_boxes, t_ids, t_confs, t_classes)):
+                        _boxes[i].tracking_id = _id
+            t2 = time.time()
 
-            # cv2.imshow("input", frame)
-            img = QImage(frame.data, frame.shape[1], frame.shape[0], QImage.Format.Format_BGR888)
-            self.viewer.set_image(img)
+            for _box in _boxes:
+                t_id = _box.tracking_id
+                if t_id != -1:
+                    self.id_cnt[t_id] += 1
+                    if self.id_cnt[t_id] == 5:
+                        self.class_cnt[_box.class_idx] += 1
 
-            time.sleep(0.005)
+                        self.edit_prod_num(_box.class_idx)
+                        self.logger.info(f"add 1 prod {_box.class_idx} - {getKeybyValue(PROD_CLASS, _box.class_idx)}")
+
+            # visualize
+            if self.parent().ck_liveView.isChecked():
+                if filter_ratio != 0:
+                    cv2.rectangle(frame, (filter_x1, filter_y1), (filter_x2, filter_y2),
+                                  color=(96, 216, 96),
+                                  thickness=2, lineType=cv2.LINE_AA)
+
+                for b in _boxes:
+                    if b.tracking_id != -1:
+                        cv2.rectangle(frame, (b.x1, b.y1), (b.x2, b.y2), (96, 96, 216), thickness=2, lineType=cv2.LINE_AA)
+                        cv2.putText(frame, f"({b.class_name})ID: {b.tracking_id}", (b.x1, b.y1 + 10),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (216, 96, 96), 2)
+
+                for i, (k, v) in enumerate(self.class_cnt.items()):
+                    cv2.putText(frame, f"{k}({self.detector.names[k]}): {v}", (img_w - 150, 30 + i * 30),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (32, 32, 32), 2)
+
+                img = QImage(frame.data, frame.shape[1], frame.shape[0], QImage.Format.Format_BGR888)
+                self.viewer.set_image(img)
+            t3 = time.time()
+
+            # calculate time
+            self.ts[0] += (t1 - t0)
+            self.ts[1] += (t2 - t1)
+            self.ts[2] += (t3 - t2)
+
+            # logging
+            self.f_cnt += 1
+            if self.f_cnt % self.log_interval == 0:
+                self.logger.debug(
+                    f"[{self.f_cnt} Frame] det: {self.ts[0] / self.f_cnt:.4f} / "
+                    f"tracking: {self.ts[1] / self.f_cnt:.4f} / "
+                    f"visualize: {self.ts[2] / self.f_cnt:.4f}")
+
+            time.sleep(0.001)
 
         # cv2.destroyAllWindows()
         self.sbar.showMessage("영상 분석 종료")
         get_logger().info("영상 분석 종료")
 
+    def edit_prod_num(self, class_idx):
+        prod_cls = class_idx
+        prod_name = getKeybyValue(PROD_CLASS, prod_cls)
 
-class ImageDialog(QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent=parent)
+        if prod_name in self.prod_loc:
+            is_accept = False
+            for p_loc in self.prod_loc[prod_name]:
+                gt_num = int(self.table_widget.item(p_loc[0], p_loc[1]-1).text())
+                prod_num = int(self.table_widget.item(p_loc[0], p_loc[1]).text())
 
-        layout = QVBoxLayout()
-        self.img = QImage()
+                # 제품 갯수 수정
+                if gt_num > prod_num:
+                    prod_num += 1
+                    item = self.table_widget.item(p_loc[0], p_loc[1])
+                    item.setText(str(prod_num))
+                    if prod_num == gt_num:      # 목표 수량 도달
+                        item.setForeground(QBrush(QColor(0, 0, 255)))
+                    is_accept = True
 
-        self.img_label = QLabel()
-        layout.addWidget(self.img_label)
+                    # 일치여부 확인 및 갱신
+                    self.table_widget.check_matching(p_loc[1] // 3)
+                    break
 
-        self.setLayout(layout)
-        self.setWindowTitle("분석화면")
-        self.setWindowModality(Qt.WindowModality.NonModal)
+            # 어떤 항목에도 갯수 수정을 하지 못함 -> 초과수량
+            if is_accept is False:
+                self.over_cnt[prod_name] += 1
+                t = "초과 수량: "
+                for k, v in self.over_cnt.items():
+                    t += f"{k} - {v}EA, "
+                self.parent().lb_over.setText(t)
 
-    def set_image(self, img):
-        self.img_label.setPixmap(QPixmap.fromImage(img))
+        else:
+            print(prod_name, prod_cls, "제품리스트에 없음")
 
 
 class ProdTable(QTableWidget):
@@ -143,6 +277,17 @@ class ProdTable(QTableWidget):
         self.col = col
         self.row = row
 
+        self.gt_cls_num = getClassNumberDict(PROD_CLASS, prod_tbl=col, column=list(row.keys())[:4])
+
+        self.content_loc = {}
+        for c, col in enumerate(self.col):
+            for r, k in enumerate(list(self.row.keys())[:4]):
+                if col[k]:
+                    # 집계 물량 테이블 좌표 저장
+                    if col[k][0] in list(self.content_loc.keys()):
+                        self.content_loc[col[k][0]].append((r+1, 3*c+2, col[k][1]))
+                    else:
+                        self.content_loc[col[k][0]] = [(r+1, 3*c+2, col[k][1])]
 
     def set_header(self):
         # Set vertical header
@@ -176,7 +321,10 @@ class ProdTable(QTableWidget):
                 if col[k]:
                     self.setItem(r + 1, 3 * c, QTableWidgetItem(col[k][0]))
                     self.setItem(r + 1, 3 * c + 1, QTableWidgetItem(str(col[k][1])))
-                    self.setItem(r + 1, 3 * c + 2, QTableWidgetItem(str(0)))
+                    item = QTableWidgetItem(str(0))
+                    item.setForeground(QBrush(QColor(255, 0, 0)))
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                    self.setItem(r + 1, 3 * c + 2, item)
                 else:
                     self.setItem(r + 1, 3 * c, QTableWidgetItem("-"))
 
@@ -194,14 +342,52 @@ class ProdTable(QTableWidget):
         for r in range(r_cnt):
             self.removeRow(r_cnt - r - 1)
 
+    def init_result(self):
+        r = self.rowCount()
+        c = self.columnCount()
+        for idx in range(c):
+            if c % 3 == 0:
+                item = QTableWidgetItem("불일치")
+                item.setForeground(QBrush(QColor(255, 0, 0)))
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.setItem(r-1, idx, item)
+
+    def check_matching(self, p_num):
+        for r in range(1, self.rowCount()):
+            gt_num = self.item(r, p_num * 3 + 1)
+            if gt_num is not None:
+                gt_num = gt_num.text()
+                prod_num = self.item(r, p_num * 3 + 2).text()
+
+                if gt_num != prod_num:
+                    return
+
+        # matching True
+        item = QTableWidgetItem("일치")
+        item.setForeground(QBrush(QColor(0, 0, 255)))
+        item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setItem(self.rowCount()-1, p_num * 3, item)
+
+    def get_shortfall(self, cur_dict):
+        less_cnt = defaultdict(int)
+        for gk, gv in self.gt_cls_num.items():
+            if gk in cur_dict.keys():
+                if gv - cur_dict[gk] > 0:
+                    less_cnt[getKeybyValue(PROD_CLASS, gk)] = gv - cur_dict[gk]
+            else:
+                less_cnt[getKeybyValue(PROD_CLASS, gk)] = gv
+        return less_cnt
+
 
 class MainWidget(QWidget):
-    def __init__(self, parent):
+    def __init__(self, cfg, parent=None):
         super().__init__(parent=parent)
 
         # init MainWidget
+        self.config = cfg
         self.logger = get_logger()
         self.logger.info("Create Main QWidget - start")
+        self.sbar = self.parent().statusBar()
 
         # top - layout
         self.top = QHBoxLayout()
@@ -210,6 +396,7 @@ class MainWidget(QWidget):
         self.el_prod_name = QLineEdit()
         self.bt_search = QPushButton("발주 조회")
         self.bt_reset = QPushButton("초기화")
+        self.ck_liveView = QCheckBox("실시간 화면", self)
 
         self.top.addWidget(QLabel("날짜:"))
         self.top.addWidget(self.el_date)
@@ -219,11 +406,15 @@ class MainWidget(QWidget):
         self.top.addWidget(self.el_prod_name)
         self.top.addWidget(self.bt_search)
         self.top.addWidget(self.bt_reset)
+        self.top.addWidget(self.ck_liveView)
 
         # middle - table
         self.middle = ProdTable(col=PROD, row=ROW)
 
         # bottom - layout
+        self.prebotttom = QHBoxLayout()
+        self.lb_over = QLabel("분석 결과:", parent=self)
+        self.prebotttom.addWidget(self.lb_over)
         self.bottom = QHBoxLayout()
         self.bt_start = QPushButton("수량 학인 시작")
         self.bt_stop = QPushButton("수량 확인 종료")
@@ -234,101 +425,137 @@ class MainWidget(QWidget):
         self.bottom.addWidget(self.bt_start)
         self.bottom.addWidget(self.bt_stop)
 
-        # show
-        self.dialog = ImageDialog()
-
         # Main Widget
         self.main_layout = QVBoxLayout()
         self.setLayout(self.main_layout)
         self.main_layout.addLayout(self.top)
         self.main_layout.addWidget(self.middle)
+        self.main_layout.addLayout(self.prebotttom)
         self.main_layout.addLayout(self.bottom)
 
-        # Status bar
-        self.sbar = self.parent().statusBar()
+        # analysis image
+        self.live_viewer = ImgDialog(parent=self, title="제품분석 - 실시간화면")
 
         # Set Input Loader
-        self.medialoader = self.parent().media_loader
-        if self.medialoader is not None:
+        try:
+            self.medialoader = MediaLoader(source="0", logger=self.logger, opt=cfg)
             self.medialoader.start()
             self.medialoader.pause()
-
-        self.analysis_thread = AnalysisThread(parent=self,
-                                              medialoader=self.medialoader,
-                                              statusbar=self.sbar,
-                                              detector=self.parent().obj_detector,
-                                              img_viewer=self.dialog)
+        except Exception as e:
+            self.logger.error(f"Medialoader can't create: {e}")
+            self.medialoader = None
+        self.obj_detector = ObjectDetector(cfg=cfg)
+        self.obj_tracker = ObjectTracker(cfg=cfg)
+        self.analysis_thread = None
 
         # signals & slots
-        self.bt_search.clicked.connect(self.set_table)
-        self.bt_reset.clicked.connect(self.clear_table)
+        self.bt_search.clicked.connect(self.setUI)
+        self.bt_reset.clicked.connect(self.clearUI)
         self.bt_start.clicked.connect(self.start_analysis)
         self.bt_stop.clicked.connect(self.stop_analysis)
-        # self.bt_show.clicked.connect(self.show_analysis)
 
         self.sbar.showMessage("프로그램 준비 완료")
         self.logger.info("Create Main QWidget - end")
 
-
     @Slot()
-    def set_table(self):
-        self.logger.info("set_table - start")
+    def setUI(self):
+        self.logger.info("setUI - start")
         self.middle.show_table()
 
+        if self.analysis_thread is not None:
+            del self.analysis_thread
+        self.analysis_thread = AnalysisThread(parent=self,
+                                              medialoader=self.medialoader,
+                                              statusbar=self.sbar,
+                                              detector=self.obj_detector,
+                                              tracker=self.obj_tracker,
+                                              img_viewer=self.live_viewer)
+
+        self.lb_over.setText("분석 결과:")
+        # 일치여부 표시
+        self.middle.init_result()
+
+        self.bt_search.setDisabled(True)
         self.bt_start.setDisabled(False)
         self.bt_stop.setDisabled(False)
-        # self.bt_show.setDisabled(False)
+
         self.sbar.showMessage("발주 내용 조회")
-        self.logger.info("set_table - end")
+        self.logger.info("setUI - end")
 
     @Slot()
-    def clear_table(self):
-        self.logger.info("clear_table - start")
+    def clearUI(self):
+        self.logger.info("clearUI - start")
         self.middle.clear_table()
 
+        self.lb_over.setText("분석 결과:")
+
+        self.bt_search.setDisabled(False)
         self.bt_start.setDisabled(True)
+        self.bt_start.setText("수량 확인 시작")
         self.bt_stop.setDisabled(True)
-        # self.bt_show.setDisabled(True)
-        self.sbar.showMessage("테이블 초기화")
-        self.logger.info("clear_table - end")
+        self.sbar.showMessage("시스템 초기화")
+        self.logger.info("clearUI - end")
 
     @Slot()
     def start_analysis(self):
         if self.medialoader:
-            self.logger.info("Start analysis")
+            self.logger.info("MainWidget - Start analysis")
             self.analysis_thread.start()
 
-            self.dialog.show()
+            # 실시간 화면 표시
+            if self.ck_liveView.isChecked():
+                self.live_viewer.show()
         else:
             try:
-                logger = get_logger()
-                self.medialoader = MediaLoader(source="0", logger=logger)
+                self.medialoader = MediaLoader(source="0", logger=self.logger)
                 self.medialoader.start()
 
                 self.analysis_thread.medialoader = self.medialoader
                 time.sleep(1)
-                self.logger.info("Start analysis")
+                self.logger.info("Medialoader is None and recreate, Start analysis")
                 self.analysis_thread.start()
 
-                self.dialog.show()
+                # 실시간 화면 표시
+                if self.ck_liveView.isChecked():
+                    self.live_viewer.show()
             except Exception as e:
                 # Exception Camera Connection
                 self.logger.error(f"Camera is not Connected: {e}")
                 _dialog = QDialog(parent=self)
                 _alert = QWidget(self)
                 _layout = QHBoxLayout()
-                _label = QLabel("카메라가 연결되어 있지 않습니다.")
+                _label = QLabel("카메라가 연결되어 있지 않습니다. 연결을 확인해주세요.")
                 _layout.addWidget(_label)
                 _dialog.setLayout(_layout)
+                _dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
                 _dialog.show()
 
     @Slot()
     def stop_analysis(self):
-        self.logger.info("Stop analysis")
+        self.logger.info("MainWidget - Stop analysis")
+
+        self.bt_start.setText("수량 확인 재개")
+        
         self.analysis_thread.stop = True
         self.analysis_thread.exit()
 
-        self.dialog.close()
+        self.live_viewer.hide()
+
+        self.analysis_thread.less_cnt = self.middle.get_shortfall(self.analysis_thread.class_cnt)
+        self.show_result()
+
+    def show_result(self):
+        t = "초과 수량: "
+        for i, (k, v) in enumerate(self.analysis_thread.over_cnt.items()):
+            t += f"{k} - {v}EA, "
+            if (i + 1) % 6 == 0:
+                t += '\n'
+        t += "\n부족 수량: "
+        for i, (k, v) in enumerate(self.analysis_thread.less_cnt.items()):
+            t += f"{k} - {v}EA, "
+            if (i + 1) % 6 == 0:
+                t += '\n'
+        self.lb_over.setText(t)
 
 
 class DaolCND(QMainWindow):
@@ -353,19 +580,11 @@ class DaolCND(QMainWindow):
         self.file_menu.addAction(exit_action)
 
         # Status Bar
-        self.statusBar().showMessage("프로그램 준비 시작", 0)
-
-        # Get Object Detector
-        self.config = config
-        self.obj_detector = ObjectDetector(cfg=self.config)
-        try:
-            self.media_loader = MediaLoader(source="0", logger=self.logger)
-        except Exception as e:
-            self.logger.warning(f"medialoader is None: {e}")
-            self.media_loader = None
+        self.sbar = self.statusBar()
+        self.sbar.showMessage("프로그램 준비 시작", 0)
 
         # Set Central Widget
-        self.main_widget = MainWidget(self)
+        self.main_widget = MainWidget(cfg=config, parent=self)
         self.setCentralWidget(self.main_widget)
 
         self.logger.info("Init DaolCND QMainWindow - end")

@@ -6,11 +6,19 @@ _C = CN()
 # Envrionments
 _C.DEVICE = None
 
+# Media
+_C.MEDIA_SOURCE = 0
+_C.MEDIA_OPT_AUTO = True
+_C.MEDIA_WIDTH = 1280
+_C.MEDIA_HEIGHT = 720
+_C.MEDIA_FPS = 30
+
 # Object Detector
 _C.IMG_SIZE = 640
 _C.DET_MODEL_TYPE = ""
 _C.DET_MODEL_PATH = ""
 _C.HALF = False
+_C.OBJ_CLASSES = None
 
 # Object Tracker
 _C.TRACK_USE_ENCODER = True
@@ -21,6 +29,7 @@ _C.TRACK_HALF = False
 # Logger
 _C.LOG_LEVEL = 'DEBUG'
 _C.CONSOLE_LOG = False
+_C.CONSOLE_LOG_INTERVAL = 10
 _C.LOGGER_NAME = ""
 _C.FILE_LOG = False
 _C.LOG_FILE_DIR = './log/'

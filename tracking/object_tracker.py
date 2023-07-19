@@ -8,8 +8,6 @@ if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 os.chdir(ROOT)
 
-from tracking.deepocsort import DeepOCSort
-
 
 class ObjectTracker(object):
     def __init__(self, cfg):
@@ -20,6 +18,7 @@ class ObjectTracker(object):
         self.tracker_type = cfg.TRACK_MODEL_TYPE.lower()
 
         if self.tracker_type == 'deepocsort':
+            from tracking.deepocsort import DeepOCSort
             device = cfg.DEVICE
             fp16 = cfg.TRACK_HALF
             embedding_off = not cfg.TRACK_USE_ENCODER
@@ -99,12 +98,12 @@ if __name__ == "__main__":
                 t_ids = track_ret[:, 4].astype(np.int32)
                 t_confs = track_ret[:, 5]
                 t_classes = track_ret[:, 6]
-                for i, xyxy, _id, conf, cls in enumerate(zip(t_boxes, t_ids, t_confs, t_classes)):
+                for i, (xyxy, _id, conf, cls) in enumerate(zip(t_boxes, t_ids, t_confs, t_classes)):
                     _boxes[i].tracking_id = _id
                     # tracking visualize
                     im = cv2.rectangle(frame,
                                        (xyxy[0] + 5, xyxy[1] + 5), (xyxy[2] - 5, xyxy[3] - 5),
-                                       (216, 96, 96), 21)
+                                       (216, 96, 96), 2)
                     cv2.putText(frame, f'id: {_id}', (xyxy[0], xyxy[1] - 10),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (216, 96, 96), 2)
         t2 = time.time()

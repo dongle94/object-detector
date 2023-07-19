@@ -30,7 +30,8 @@ class ObjectDetector(object):
             ext = os.path.splitext(weight)[1]
             if ext in ['.pt', '.pth']:
                 from obj_detectors.yolov5_pt import YoloDetector
-                self.detector = YoloDetector(weight=weight, device=device, img_size=img_size, fp16=fp16)
+                self.detector = YoloDetector(weight=weight, device=device, img_size=img_size, fp16=fp16,
+                                             classes=cfg.OBJ_CLASSES)
                 self.names = self.detector.names
             elif ext == '.onnx':
                 from obj_detectors.yolov5_onnx import YoloOnnxDetector

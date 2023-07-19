@@ -18,7 +18,8 @@ from obj_detectors.models.torch_utils import select_device
 
 
 class YoloDetector(nn.Module):
-    def __init__(self, weight='yolov5s.pt', device: int or str = "cpu", img_size=640, fp16=False, auto=True, fuse=True):
+    def __init__(self, weight='yolov5s.pt', device: int or str = "cpu", img_size=640, fp16=False, auto=True, fuse=True,
+                 classes=None):
         super().__init__()
 
         device = "cpu" if device == "" else device
@@ -32,6 +33,7 @@ class YoloDetector(nn.Module):
         self.img_size = check_img_size(img_size, s=self.stride)
         self.names = _model.module.names if hasattr(_model, 'module') else _model.names  # get class names
         self.auto = auto
+        self.classes = classes
 
     def warmup(self, imgsz=(1, 3, 640, 640)):
         _im = torch.empty(*imgsz, dtype=torch.half if self.fp16 else torch.float, device=self.device)  # input
@@ -60,9 +62,8 @@ class YoloDetector(nn.Module):
         else:
             return self.from_numpy(y)
 
-    @staticmethod
-    def postprocess(pred, im_shape, im0_shape, max_det=100):
-        pred = non_max_suppression(pred, classes=[0], max_det=max_det)[0]
+    def postprocess(self, pred, im_shape, im0_shape, max_det=100):
+        pred = non_max_suppression(pred, classes=self.classes, max_det=max_det)[0]
         det = scale_boxes(im_shape[2:], copy.deepcopy(pred[:, :4]), im0_shape).round()
         det = torch.cat([det, pred[:, 4:]], dim=1)
 

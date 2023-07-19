@@ -29,6 +29,7 @@ _C.TRACK_HALF = False
 # Logger
 _C.LOG_LEVEL = 'DEBUG'
 _C.CONSOLE_LOG = False
+_C.CONSOLE_LOG_INTERVAL = 10
 _C.LOGGER_NAME = ""
 _C.FILE_LOG = False
 _C.LOG_FILE_DIR = './log/'

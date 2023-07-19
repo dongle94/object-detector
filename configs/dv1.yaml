@@ -24,6 +24,7 @@ TRACK_HALF: false
 # Logger
 LOG_LEVEL: 'info'
 CONSOLE_LOG: true
+CONSOLE_LOG_INTERVAL: 10
 LOGGER_NAME: "DV1"
 FILE_LOG: true
 LOG_FILE_DIR: './log/'

@@ -4,10 +4,12 @@ import sys
 from pathlib import Path
 
 FILE = Path(__file__).resolve()
-ROOT = FILE.parents[1]
+ROOT = FILE.parents[2]
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 os.chdir(ROOT)
+
+from utils.logger import get_logger
 
 
 class ObjectDetector(object):
@@ -29,17 +31,18 @@ class ObjectDetector(object):
             # model load with weight
             ext = os.path.splitext(weight)[1]
             if ext in ['.pt', '.pth']:
-                from obj_detectors.yolov5_pt import YoloDetector
+                from core.obj_detectors.yolov5_pt import YoloDetector
                 self.detector = YoloDetector(weight=weight, device=device, img_size=img_size, fp16=fp16,
                                              classes=cfg.OBJ_CLASSES)
                 self.names = self.detector.names
             elif ext == '.onnx':
-                from obj_detectors.yolov5_onnx import YoloOnnxDetector
+                from core.obj_detectors.yolov5_onnx import YoloOnnxDetector
                 self.detector = YoloOnnxDetector(weight=weight, device=device, img_size=img_size, fp16=fp16)
                 self.names = self.detector.names
 
             # warm up
             self.detector.warmup(imgsz=(1, 3, img_size, img_size))
+            get_logger().info(f"Successfully loaded weight from {weight}")
 
     def preprocess(self, img):
         if self.detector_type == "yolo":

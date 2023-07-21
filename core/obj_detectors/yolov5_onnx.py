@@ -7,12 +7,12 @@ import onnxruntime as ort
 
 from pathlib import Path
 FILE = Path(__file__).resolve()
-ROOT = FILE.parents[1]
+ROOT = FILE.parents[2]
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
 os.chdir(ROOT)
 
-from obj_detectors.models.image_processing import letterbox, non_max_suppression, scale_boxes
+from core.obj_detectors.models.image_processing import letterbox, non_max_suppression, scale_boxes
 
 class YoloOnnxDetector(object):
     def __init__(self, weight, device='cpu', img_size=640, fp16=False):

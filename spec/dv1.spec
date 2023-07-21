@@ -12,8 +12,8 @@ block_cipher = None
 
 
 a = Analysis(
-    ['gui/dv1.py'],
-    pathex=['./', './obj_detectors/'],
+    ['../gui/dv1.py'],
+    pathex=['./', './core/obj_detectors/'],
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,

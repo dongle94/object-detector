@@ -3,7 +3,9 @@ import sys
 
 from pathlib import Path
 FILE = Path(__file__).resolve()
-ROOT = FILE.parents[1]
+ROOT = FILE.parents[2]
+print(list(FILE.parents))
+exit()
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 os.chdir(ROOT)
@@ -18,7 +20,7 @@ class ObjectTracker(object):
         self.tracker_type = cfg.TRACK_MODEL_TYPE.lower()
 
         if self.tracker_type == 'deepocsort':
-            from tracking.deepocsort import DeepOCSort
+            from core.tracking.deepocsort import DeepOCSort
             device = cfg.DEVICE
             fp16 = cfg.TRACK_HALF
             embedding_off = not cfg.TRACK_USE_ENCODER
@@ -46,7 +48,7 @@ if __name__ == "__main__":
     from utils.config import update_config
     from utils.logger import get_logger, init_logger
 
-    from obj_detectors import ObjectDetector
+    from core.obj_detectors import ObjectDetector
     from utils.medialoader import MediaLoader
     from core.bbox import BBox
 

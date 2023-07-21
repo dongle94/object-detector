@@ -15,7 +15,7 @@ from copy import deepcopy
 from pathlib import Path
 
 FILE = Path(__file__).resolve()
-ROOT = FILE.parents[1]  # YOLOv5 root directory
+ROOT = FILE.parents[3]  # YOLOv5 root directory
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
 if platform.system() != 'Windows':
@@ -27,8 +27,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torchvision
-from models.common import *
-from models.torch_utils import fuse_conv_and_bn, model_info
+from core.obj_detectors.models.common import *
+from core.obj_detectors.models.torch_utils import fuse_conv_and_bn, model_info
 
 
 try:

@@ -9,7 +9,7 @@ from collections import OrderedDict, defaultdict
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QDialog
 from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QTableWidget, QLineEdit, QLabel, QPushButton, QTableWidgetItem,\
     QCheckBox
-from PySide6.QtGui import QAction, QImage, QPixmap, QBrush, QColor
+from PySide6.QtGui import QAction, QImage, QBrush, QColor
 from PySide6.QtCore import Qt, QSize, Slot, QThread
 
 from pathlib import Path
@@ -23,8 +23,8 @@ from core.bbox import BBox
 from utils.config import _C as cfg, update_config
 from utils.logger import init_logger, get_logger
 
-from obj_detectors import ObjectDetector
-from tracking import ObjectTracker
+from core.obj_detectors import ObjectDetector
+from core.tracking import ObjectTracker
 from utils.medialoader import MediaLoader
 
 from gui.image import ImgDialog

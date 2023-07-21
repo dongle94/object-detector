@@ -12,9 +12,9 @@ if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
 os.chdir(ROOT)
 
-from obj_detectors.yolov5_pt import attempt_load
-from obj_detectors.models.torch_utils import select_device
-from obj_detectors.models.yolo import Detect
+from core.obj_detectors.yolov5_pt import attempt_load
+from core.obj_detectors.models.torch_utils import select_device
+from core.obj_detectors.models.yolo import Detect
 
 def convert(opt):
     # input shape

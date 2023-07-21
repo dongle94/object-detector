@@ -4,8 +4,6 @@ import sys
 from pathlib import Path
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[2]
-print(list(FILE.parents))
-exit()
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 os.chdir(ROOT)

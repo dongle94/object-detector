@@ -592,7 +592,7 @@ class DaolCND(QMainWindow):
 
 def args_parse():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config', type=str, help='configuration')
+    parser.add_argument('-c', '--config', type=str, help='configuration', default='./configs/dv1.yaml')
     _args = parser.parse_args()
     return _args
 

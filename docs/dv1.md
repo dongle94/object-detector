@@ -29,3 +29,26 @@ to fit your needs.
 # repository root directory
 $ python gui/dv1.py -c ./configs/dv1.yaml
 ```
+
+## deployment
+To create linux executable and Windows exe program need `Pyinstaller` library.
+you need install pyinstaller.
+```shell
+$ pip install pyinstaller
+```
+And below scripts create executable program with no detail install.
+```shell
+$ pyinstaller -D ./gui/dv1.py --name DV1 -p ./ -p ./obj_detectors/ --collect-all torchvision
+```
+It makes `build`, `dist` directory in repository. we use `dist` directory. 
+That directory includes executable file you naming with `--name`.
+Before you run, you need to copy weight and config in this directory.
+you can execute this file in terminal or by double click.
+```shell
+$ cd ./dist/dv1
+$ cp -r ../../weights ./
+$ cp -r ../../configs ./
+
+# default is ./DV1 -c ./configs/dv1.yaml
+$ ./DV1 
+```

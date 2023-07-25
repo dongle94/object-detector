@@ -4,7 +4,7 @@
 opencv-python==4.5.4.60
 Pillow
 pandas>=1.1.4
-numpy==1.24.4
+numpy==1.23.5
 --index-url https://download.pytorch.org/whl/cu117
 torch==2.0.1
 torchvision==0.15.2

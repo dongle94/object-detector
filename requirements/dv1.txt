@@ -1,5 +1,5 @@
 # common
-numpy==1.24.4
+numpy==1.23.5
 opencv-python==4.5.4.60
 Pillow
 pandas>=1.1.4

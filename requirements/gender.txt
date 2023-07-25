@@ -1,0 +1,5 @@
+keras==2.9.0
+tensorflow==2.9.3
+gdown
+opencv-python==4.5.4.60
+numpy==1.23.5

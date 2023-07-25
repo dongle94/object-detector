@@ -11,7 +11,7 @@ from .osnet import *
 # from .resnet import *
 # from .densenet import *
 # from .xception import *
-# from .osnet_ain import *
+from .osnet_ain import *
 # from .resnetmid import *
 # from .shufflenet import *
 # from .squeezenet import *
@@ -72,10 +72,10 @@ __model_factory = {
     'osnet_x0_5': osnet_x0_5,
     'osnet_x0_25': osnet_x0_25,
     'osnet_ibn_x1_0': osnet_ibn_x1_0,
-    # 'osnet_ain_x1_0': osnet_ain_x1_0,
-    # 'osnet_ain_x0_75': osnet_ain_x0_75,
-    # 'osnet_ain_x0_5': osnet_ain_x0_5,
-    # 'osnet_ain_x0_25': osnet_ain_x0_25,
+    'osnet_ain_x1_0': osnet_ain_x1_0,
+    'osnet_ain_x0_75': osnet_ain_x0_75,
+    'osnet_ain_x0_5': osnet_ain_x0_5,
+    'osnet_ain_x0_25': osnet_ain_x0_25,
     # 'lmbn_n': LMBN_n
 }
 

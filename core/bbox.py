@@ -1,4 +1,5 @@
-
+import time
+import numpy as np
 
 class BBox(object):
     def __init__(self, tlbr=None, tlwh=None, rel=False, class_index=-1, class_name="", conf=0., imgsz=None):
@@ -33,5 +34,23 @@ class BBox(object):
                 self.x2 = self.x1 + self.w
                 self.y2 = self.y1 + self.h
 
+        self.create_time = time.time()
+        self.last_update_time = time.time()
+        self.opt_data = {}
+
     def __repr__(self):
         return f"{self.class_name}: {self.x1, self.y1, self.x2, self.y2}, conf:{self.confidence:.6f}"
+
+    def set_points(self, coords):
+        coords = np.reshape(coords, (2, 2))
+        self.x1 = int(coords[0][0])
+        self.y1 = int(coords[0][1])
+        self.x2 = int(coords[1][0])
+        self.y2 = int(coords[1][1])
+        self.w = self.x2 - self.x1
+        self.h = self.y2 - self.y1
+
+        self.update()
+
+    def update(self):
+        self.last_update_time = time.time()

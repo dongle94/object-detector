@@ -3,6 +3,7 @@ import os
 import sys
 import argparse
 from datetime import datetime
+from collections import defaultdict
 import cv2
 
 from pathlib import Path
@@ -22,12 +23,17 @@ def main(opt=None):
     get_logger().info(f"Input Directory is {IMGS_DIR}")
 
     detector = ObjectDetector(cfg=cfg)
+    obj_classes = defaultdict(int)
 
     if os.path.exists(opt.json_file):
         with open(opt.json_file, 'r') as file:
             basic_fmt = json.load(file)
         img_ids = int(basic_fmt['images'][-1]['id']) + 1 if len(basic_fmt['images']) != 0 else 0
-        anno_ids = int(basic_fmt["annotations"][-1]['id']) + 1 if len(basic_fmt['annotations']) != 0 else 0
+        anno_ids = 0
+        if len(basic_fmt['annotations']) != 0:
+            anno_ids = int(basic_fmt["annotations"][-1]['id']) + 1
+            for anno in basic_fmt['annotations']:
+                obj_classes[int(anno['category_id'])] += 1
     else:
         get_logger().info(f"{opt.json_file} is not exist. Create new annotation file")
         basic_fmt = {
@@ -76,12 +82,14 @@ def main(opt=None):
 
         # bbox annotation
         for d in _det:
+            if d[4] < float(opt.confidence):
+                continue
             x1, y1, x2, y2 = map(int, d[:4])
             w, h = x2-x1, y2-y1
             fc = f.copy()
             cv2.rectangle(fc, (x1, y1), (x2, y2), (96, 96, 216), thickness=2, lineType=cv2.LINE_AA)
 
-            cv2.imshow('_', fc)
+            cv2.imshow(img_file, fc)
             category_id = 0
             k = cv2.waitKey(0)
             if k == ord('q'):
@@ -100,6 +108,7 @@ def main(opt=None):
                          "area": w*h,
                          "segmentation": [],
                          "iscrowd": 0}
+            obj_classes[category_id] += 1
             basic_fmt["annotations"].append(anno_info)
             anno_ids += 1
         img_ids += 1
@@ -114,6 +123,8 @@ def args_parse():
                         help='image directory path')
     parser.add_argument('-j', '--json_file', required=True,
                         help="if write this file, append annotations")
+    parser.add_argument('-c', '--confidence', default=0.3,
+                        help="obj_detector confidence")
     _args = parser.parse_args()
     return _args
 

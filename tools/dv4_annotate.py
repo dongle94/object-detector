@@ -1,3 +1,7 @@
+"""
+datavoucher 4 - withyou
+human object classes by gender: male, female
+"""
 import json
 import os
 import sys
@@ -93,7 +97,7 @@ def main(opt=None):
             w, h = x2-x1, y2-y1
             fc = f.copy()
             cv2.rectangle(fc, (x1, y1), (x2, y2), (16, 16, 255), thickness=2, lineType=cv2.LINE_AA)
-            if fc.shape줌[0] > 1000:
+            if fc.shape[0] > 1000:
                 fc = cv2.resize(fc, (int(fc.shape[1] * 0.8), int(fc.shape[0] * 0.8)))
             cv2.imshow(img_file, fc)
             category_id = 0

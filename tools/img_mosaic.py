@@ -65,6 +65,7 @@ def process_mosaic(opt):
         files = os.listdir(inps)
         inps = [os.path.abspath(os.path.join(inps, f)) for f in files
                 if os.path.isfile(os.path.abspath(os.path.join(inps, f)))]
+        inps.sort()
     else:
         print("There is no image files")
         return
@@ -150,7 +151,7 @@ def process_mosaic(opt):
             cv2.imwrite(os.path.join(save_dir, os.path.basename(inp)), img)
     et = time.time()
     if f_cnt:
-        print(f"{f_cnt} images spend {(et - st) / f_cnt:.4f} sec.")
+        print(f"{f_cnt} images spend {et - st:.4f} sec.")
 
 
 def args_parse():

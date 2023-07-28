@@ -5,6 +5,7 @@ import argparse
 from datetime import datetime
 from collections import defaultdict
 import cv2
+import shutil
 
 from pathlib import Path
 FILE = Path(__file__).resolve()
@@ -28,12 +29,17 @@ def main(opt=None):
     if os.path.exists(opt.json_file):
         with open(opt.json_file, 'r') as file:
             basic_fmt = json.load(file)
-        img_ids = int(basic_fmt['images'][-1]['id']) + 1 if len(basic_fmt['images']) != 0 else 0
+        get_logger().info(f"{opt.json_file} is exist. append annotation file.")
+        img_ids = 0
+        if len(basic_fmt['images']) != 0:
+            img_ids = int(basic_fmt['images'][-1]['id']) + 1
+            get_logger().info(f"last image file name: {basic_fmt['images'][-1]['file_name']}")
         anno_ids = 0
         if len(basic_fmt['annotations']) != 0:
             anno_ids = int(basic_fmt["annotations"][-1]['id']) + 1
             for anno in basic_fmt['annotations']:
                 obj_classes[int(anno['category_id'])] += 1
+            get_logger().info(f"old object classes: {obj_classes}")
     else:
         get_logger().info(f"{opt.json_file} is not exist. Create new annotation file")
         basic_fmt = {
@@ -78,7 +84,6 @@ def main(opt=None):
             "width": f.shape[1],
             "data_captured": datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
         }
-        basic_fmt["images"].append(img_info)
 
         # bbox annotation
         for d in _det:
@@ -87,8 +92,9 @@ def main(opt=None):
             x1, y1, x2, y2 = map(int, d[:4])
             w, h = x2-x1, y2-y1
             fc = f.copy()
-            cv2.rectangle(fc, (x1, y1), (x2, y2), (96, 96, 216), thickness=2, lineType=cv2.LINE_AA)
-
+            cv2.rectangle(fc, (x1, y1), (x2, y2), (16, 16, 255), thickness=2, lineType=cv2.LINE_AA)
+            if fc.shape줌[0] > 1000:
+                fc = cv2.resize(fc, (int(fc.shape[1] * 0.8), int(fc.shape[0] * 0.8)))
             cv2.imshow(img_file, fc)
             category_id = 0
             k = cv2.waitKey(0)
@@ -100,6 +106,8 @@ def main(opt=None):
                 category_id = 1
             elif k == ord('0'):
                 category_id = 0
+            elif k == ord('d'):
+                continue
 
             anno_info = {"id": anno_ids,
                          "image_id": img_ids,
@@ -111,11 +119,19 @@ def main(opt=None):
             obj_classes[category_id] += 1
             basic_fmt["annotations"].append(anno_info)
             anno_ids += 1
+
+        cv2.destroyAllWindows()
+        if is_out is False:
+            basic_fmt["images"].append(img_info)
+            new_path = os.path.join(IMGS_DIR, 'already', i)
+            if not os.path.exists(os.path.dirname(new_path)):
+                os.makedirs(os.path.dirname(new_path))
+            shutil.move(img_file, new_path)
         img_ids += 1
 
     with open(os.path.join(opt.json_file), 'w') as outfile:
         json.dump(basic_fmt, outfile, indent=2)
-
+    get_logger().info(f"obj classes: {obj_classes}")
 
 def args_parse():
     parser = argparse.ArgumentParser()

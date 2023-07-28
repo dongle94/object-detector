@@ -104,7 +104,7 @@ def main(opt=None):
             anno_ids += 1
         img_ids += 1
 
-    with open(os.path.join(IMGS_DIR, "../annotations.json"), 'w') as outfile:
+    with open(os.path.join(opt.json_file), 'w') as outfile:
         json.dump(basic_fmt, outfile, indent=2)
 
 

@@ -18,17 +18,18 @@ from utils.logger import get_logger, init_logger
 from core.obj_detectors import ObjectDetector
 
 def main(opt=None):
-    # IMGS_DIR = '/home/dongle94/Videos/datavoucher/quantom/20210505200137_DDOBONG_ch2'
     IMGS_DIR = opt.imgs_dir
+    get_logger().info(f"Input Directory is {IMGS_DIR}")
 
     detector = ObjectDetector(cfg=cfg)
 
-    if os.path.isfile(opt.json_file):
+    if os.path.exists(opt.json_file):
         with open(opt.json_file, 'r') as file:
             basic_fmt = json.load(file)
         img_ids = int(basic_fmt['images'][-1]['id']) + 1 if len(basic_fmt['images']) != 0 else 0
         anno_ids = int(basic_fmt["annotations"][-1]['id']) + 1 if len(basic_fmt['annotations']) != 0 else 0
     else:
+        get_logger().info(f"{opt.json_file} is not exist. Create new annotation file")
         basic_fmt = {
             "info": {"year": "2023", "version": "1",
                      "description": "",
@@ -55,6 +56,7 @@ def main(opt=None):
             continue
 
         img_file = os.path.join(IMGS_DIR, i)
+        get_logger().info(f"process {img_file}.")
         f = cv2.imread(img_file)
 
         # yolov5 human detector
@@ -83,14 +85,13 @@ def main(opt=None):
             category_id = 0
             k = cv2.waitKey(0)
             if k == ord('q'):
-                print("-- CV2 Stop --")
+                get_logger().info("-- CV2 Stop --")
                 is_out = True
                 break
-            elif k == ord('f'):
-                print("-- Click f --")
-            elif k == ord('m'):
-                print("-- Click m --")
+            elif k == ord('1'):
                 category_id = 1
+            elif k == ord('0'):
+                category_id = 0
 
             anno_info = {"id": anno_ids,
                          "image_id": img_ids,
@@ -111,9 +112,8 @@ def args_parse():
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--imgs_dir', required=True,
                         help='image directory path')
-    parser.add_argument('-j', '--json_file',
+    parser.add_argument('-j', '--json_file', required=True,
                         help="if write this file, append annotations")
-    parser.add_argument('--show', action='store_true')
     _args = parser.parse_args()
     return _args
 

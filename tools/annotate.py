@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+import argparse
 from datetime import datetime
 import cv2
 
@@ -16,39 +17,47 @@ from utils.config import update_config
 from utils.logger import get_logger, init_logger
 from core.obj_detectors import ObjectDetector
 
-def main():
-    IMGS_DIR = '/home/dongle94/Videos/datavoucher/quantom/20210505200137_DDOBONG_ch2'
-    update_config(cfg, args='./configs/annotate.yaml')
-    init_logger(cfg)
+def main(opt=None):
+    # IMGS_DIR = '/home/dongle94/Videos/datavoucher/quantom/20210505200137_DDOBONG_ch2'
+    IMGS_DIR = opt.imgs_dir
+
     detector = ObjectDetector(cfg=cfg)
 
-    basic_fmt = {
-        "info": {"year": "2023", "version": "1",
-                 "description": "",
-                 "contributor": "",
-                 "url": "",
-                 "date_created": datetime.now().strftime("%Y-%m-%dT%H:%M:%S")},
-        "licenses": [{"id": 1, "url": "", "name": "Unknown"}],
-        "categories": [{"id": 0, "name": "male", "supercategory": "person"},
-                       {"id": 1, "name": "female", "supercategory": "person"}],
-        "images": [],
-        "annotations": []
+    if os.path.isfile(opt.json_file):
+        with open(opt.json_file, 'r') as file:
+            basic_fmt = json.load(file)
+        img_ids = int(basic_fmt['images'][-1]['id']) + 1 if len(basic_fmt['images']) != 0 else 0
+        anno_ids = int(basic_fmt["annotations"][-1]['id']) + 1 if len(basic_fmt['annotations']) != 0 else 0
+    else:
+        basic_fmt = {
+            "info": {"year": "2023", "version": "1",
+                     "description": "",
+                     "contributor": "",
+                     "url": "",
+                     "date_created": datetime.now().strftime("%Y-%m-%dT%H:%M:%S")},
+            "licenses": [{"id": 1, "url": "", "name": "Unknown"}],
+            "categories": [{"id": 0, "name": "male", "supercategory": "person"},
+                           {"id": 1, "name": "female", "supercategory": "person"}],
+            "images": [],
+            "annotations": []
+        }
+        img_ids = 0
+        anno_ids = 0
 
-    }
+    is_out = False
 
-    img_ids = 0
-    anno_ids = 0
     IMGS = os.listdir(IMGS_DIR)
     IMGS.sort()
-    is_out = False
     for i in IMGS:
-        if os.path.splitext(i)[-1].lower() not in ['.jpg', '.png', '.jpeg', '.bmp']:
-            continue
-        img_file = os.path.join(IMGS_DIR, i)
         if is_out is True:
             break
+        if os.path.splitext(i)[-1].lower() not in ['.jpg', '.png', '.jpeg', '.bmp']:
+            continue
+
+        img_file = os.path.join(IMGS_DIR, i)
         f = cv2.imread(img_file)
 
+        # yolov5 human detector
         im = detector.preprocess(f)
         _pred = detector.detect(im)
         _pred, _det = detector.postprocess(_pred)
@@ -98,5 +107,21 @@ def main():
         json.dump(basic_fmt, outfile, indent=2)
 
 
+def args_parse():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-i', '--imgs_dir', required=True,
+                        help='image directory path')
+    parser.add_argument('-j', '--json_file',
+                        help="if write this file, append annotations")
+    parser.add_argument('--show', action='store_true')
+    _args = parser.parse_args()
+    return _args
+
+
 if __name__ == "__main__":
-    main()
+    args = args_parse()
+
+    update_config(cfg, args='./configs/annotate.yaml')
+    init_logger(cfg)
+
+    main(args)

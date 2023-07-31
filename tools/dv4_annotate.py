@@ -90,6 +90,8 @@ def main(opt=None):
         }
 
         # bbox annotation
+        c_id = defaultdict(int)
+        tmp_annos = []
         for d in _det:
             if d[4] < float(opt.confidence):
                 continue
@@ -97,9 +99,11 @@ def main(opt=None):
             w, h = x2-x1, y2-y1
             fc = f.copy()
             cv2.rectangle(fc, (x1, y1), (x2, y2), (16, 16, 255), thickness=2, lineType=cv2.LINE_AA)
+
             if fc.shape[0] > 1000:
                 fc = cv2.resize(fc, (int(fc.shape[1] * 0.8), int(fc.shape[0] * 0.8)))
             cv2.imshow(img_file, fc)
+
             category_id = 0
             k = cv2.waitKey(0)
             if k == ord('q'):
@@ -107,9 +111,9 @@ def main(opt=None):
                 is_out = True
                 break
             elif k == ord('1'):
-                category_id = 1
-            elif k == ord('0'):
                 category_id = 0
+            elif k == ord('2'):
+                category_id = 1
             elif k == ord('d'):
                 continue
 
@@ -120,12 +124,17 @@ def main(opt=None):
                          "area": w*h,
                          "segmentation": [],
                          "iscrowd": 0}
-            obj_classes[category_id] += 1
-            basic_fmt["annotations"].append(anno_info)
+            tmp_annos.append(anno_info)
             anno_ids += 1
+            c_id[category_id] += 1
 
         cv2.destroyAllWindows()
         if is_out is False:
+            for k, v in c_id.items():
+                obj_classes[k] += v
+            for _anno_info in tmp_annos:
+                basic_fmt["annotations"].append(_anno_info)
+
             basic_fmt["images"].append(img_info)
             new_path = os.path.join(IMGS_DIR, 'already', i)
             if not os.path.exists(os.path.dirname(new_path)):
@@ -136,6 +145,7 @@ def main(opt=None):
     with open(os.path.join(opt.json_file), 'w') as outfile:
         json.dump(basic_fmt, outfile, indent=2)
     get_logger().info(f"obj classes: {obj_classes}")
+
 
 def args_parse():
     parser = argparse.ArgumentParser()

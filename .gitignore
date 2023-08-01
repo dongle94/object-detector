@@ -6,3 +6,7 @@ weights
 
 # log
 log
+
+# pyinstaller
+build
+dist

@@ -71,15 +71,15 @@ def main(opt=None):
     detector = ObjectDetector(cfg=cfg)
     obj_classes = defaultdict(int)
 
+    img_ids = 0
+    anno_ids = 0
     if os.path.exists(opt.json_file):
         with open(opt.json_file, 'r') as file:
             basic_fmt = json.load(file)
         get_logger().info(f"{opt.json_file} is exist. append annotation file.")
-        img_ids = 0
         if len(basic_fmt['images']) != 0:
             img_ids = int(basic_fmt['images'][-1]['id']) + 1
             get_logger().info(f"last image file name: {basic_fmt['images'][-1]['file_name']}")
-        anno_ids = 0
         if len(basic_fmt['annotations']) != 0:
             anno_ids = int(basic_fmt["annotations"][-1]['id']) + 1
             for anno in basic_fmt['annotations']:
@@ -94,13 +94,12 @@ def main(opt=None):
                      "url": "",
                      "date_created": datetime.now().strftime("%Y-%m-%dT%H:%M:%S")},
             "licenses": [{"id": 1, "url": "", "name": "Unknown"}],
-            "categories": [{"id": 0, "name": "male", "supercategory": "person"},
-                           {"id": 1, "name": "female", "supercategory": "person"}],
+            "categories": [{"id": 0, "name": "homo", "supercategory": "person"},
+                           {"id": 1, "name": "hetero", "supercategory": "person"},
+                           {"id": 2, "name": "unknown", "supercategory": "person"}],
             "images": [],
             "annotations": []
         }
-        img_ids = 0
-        anno_ids = 0
 
     is_out = False
 
@@ -134,26 +133,30 @@ def main(opt=None):
         _det = [d for d in _det if d[4] > float(opt.confidence)]
         _arr = get_l2_norm(_det)
         _boxes = get_closed_boxes(_arr, threshold=120)
-        print(_boxes)
         _new_boxes = get_merge_boxes(_det, _boxes)
+        get_logger().info(f"pair boxes: {_boxes}")
 
         f1 = f0.copy()
-        for i, d in enumerate(_det):
+        # draw whole boxes in images
+        for idx, d in enumerate(_det):
             x1, y1, x2, y2 = map(int, d[:4])
-            w, h = x2-x1, y2-y1
 
             cv2.rectangle(f1, (x1, y1), (x2, y2), (16, 16, 255), thickness=2, lineType=cv2.LINE_AA)
-            cv2.putText(f1, f"{i}", (x1+10, y1+20), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+            cv2.putText(f1, f"{idx}", (x1+10, y1+20), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
                         fontScale=0.5, color=(255, 16, 16), thickness=2)
 
-            d = ((2 * 3.14 * 180) / (w + h * 360) * 1000 + 3)
-            cv2.putText(f1, f"d: {d:.3f}", (int(x1+w/2), int(y1+h/2)), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-                        fontScale=0.5, color=(255, 16, 16), thickness=2)
+            # w, h = x2-x1, y2-y1
+            # d = ((2 * 3.14 * 180) / (w + h * 360) * 1000 + 3)
+            # cv2.putText(f1, f"d: {d:.3f}", (int(x1+w/2), int(y1+h/2)), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+            #             fontScale=0.5, color=(255, 16, 16), thickness=2)
 
-        # group box draw
+        # draw group box
+        c_id = defaultdict(int)
+        tmp_annos = []
         for d in _new_boxes:
             f2 = f1.copy()
             x1, y1, x2, y2 = d
+            w, h = x2-x1, y2-y1
             cv2.rectangle(f2, (x1, y1), (x2, y2), (16, 255, 16), thickness=3, lineType=cv2.LINE_AA)
 
             if f2.shape[0] > 1000:
@@ -163,43 +166,49 @@ def main(opt=None):
             new_frame = f0[y1:y2, x1:x2]
             cv2.imshow("crop", new_frame)
 
+            category_id = 0
             k = cv2.waitKey(0)
             if k == ord('q'):
                 get_logger().info("-- CV2 Stop --")
                 is_out = True
                 break
-            # category_id = 0
+            elif k == ord('1'):
+                category_id = 0
+            elif k == ord('2'):
+                category_id = 1
+            elif k == ord('3'):
+                category_id = 2
+            elif k == ord('d'):
+                continue
 
-            # elif k == ord('1'):
-            #     category_id = 1
-            # elif k == ord('0'):
-            #     category_id = 0
-            # elif k == ord('d'):
-            #     continue
-            #
-            # anno_info = {"id": anno_ids,
-            #              "image_id": img_ids,
-            #              "category_id": category_id,
-            #              "bbox": [x1, y1, w, h],
-            #              "area": w*h,
-            #              "segmentation": [],
-            #              "iscrowd": 0}
-            # obj_classes[category_id] += 1
-            # basic_fmt["annotations"].append(anno_info)
-            # anno_ids += 1
+            anno_info = {"id": anno_ids,
+                         "image_id": img_ids,
+                         "category_id": category_id,
+                         "bbox": [x1, y1, w, h],
+                         "area": w*h,
+                         "segmentation": [],
+                         "iscrowd": 0}
+            tmp_annos.append(anno_info)
+            anno_ids += 1
+            c_id[category_id] += 1
 
         cv2.destroyAllWindows()
-        # if is_out is False:
-        #     basic_fmt["images"].append(img_info)
-        #     new_path = os.path.join(IMGS_DIR, 'already', i)
-        #     if not os.path.exists(os.path.dirname(new_path)):
-        #         os.makedirs(os.path.dirname(new_path))
-        #     shutil.move(img_file, new_path)
-        # img_ids += 1
+        if is_out is False:
+            for k, v in c_id.items():
+                obj_classes[k] += v
+            for _anno_info in tmp_annos:
+                basic_fmt["annotations"].append(_anno_info)
 
-    # with open(os.path.join(opt.json_file), 'w') as outfile:
-    #     json.dump(basic_fmt, outfile, indent=2)
-    # get_logger().info(f"obj classes: {obj_classes}")
+            basic_fmt["images"].append(img_info)
+            new_path = os.path.join(IMGS_DIR, 'already', i)
+            if not os.path.exists(os.path.dirname(new_path)):
+                os.makedirs(os.path.dirname(new_path))
+            shutil.move(img_file, new_path)
+        img_ids += 1
+
+    with open(os.path.join(opt.json_file), 'w') as outfile:
+        json.dump(basic_fmt, outfile, indent=1)
+    get_logger().info(f"obj classes: {obj_classes}")
 
 
 def args_parse():

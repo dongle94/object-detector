@@ -1,4 +1,1 @@
 dlib
-opencv-python==4.5.4.60
-numpy==1.23.5
-tqdm

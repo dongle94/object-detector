@@ -41,12 +41,18 @@ def run(opt):
         for train_img in t_timgs:
             src_path = os.path.join(image_dir, train_img)
             dst_path = os.path.join(image_dir, 'train', train_img)
-            shutil.copy2(src_path, dst_path)
+            if opt.move:
+                shutil.move(src_path, dst_path)
+            else:
+                shutil.copy2(src_path, dst_path)
         t_vimgs = tqdm(val_imgs, 'split val_images')
         for val_img in t_vimgs:
             src_path = os.path.join(image_dir, val_img)
             dst_path = os.path.join(image_dir, 'val', val_img)
-            shutil.copy2(src_path, dst_path)
+            if opt.move:
+                shutil.move(src_path, dst_path)
+            else:
+                shutil.copy2(src_path, dst_path)
 
     print("Success split datasets!")
 
@@ -58,6 +64,8 @@ def args_parse():
     parser.add_argument('-r', '--tv_ratio', type=float, default=0.9,
                         help="training set ratio. default is 0.9. "
                              "0.9 means that training sets' ratio is 0.9 and validation sets' 0.1")
+    parser.add_argument('--move', action='store_true',
+                        help='if write this option, no image copy, move images.')
     _args = parser.parse_args()
     return _args
 

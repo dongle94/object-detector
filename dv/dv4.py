@@ -7,7 +7,8 @@ import numpy as np
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QDialog
 from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QLineEdit, QLabel, QPushButton
 from PySide6.QtWidgets import QFileDialog
-from PySide6.QtCore import QSize, Qt, Slot
+from PySide6.QtCore import QSize, Qt, Slot, QPoint
+from PySide6.QtGui import QMouseEvent
 
 from pathlib import Path
 FILE = Path(__file__).resolve()
@@ -23,6 +24,40 @@ from utils.logger import init_logger, get_logger
 from utils.medialoader import MediaLoader
 from gui.image import ImgWidget, ImgDialog
 from gui.widget import MsgDialog
+
+
+class SetAreaDialog(QDialog):
+    def __init__(self, img, parent=None):
+        super().__init__(parent=parent)
+
+        label = QLabel("3개 이상의 점을 찍어 영역을 설정해 주세요.")
+        self.img_size = img.shape
+        self.img = ImgWidget(parent=self, polygon=True)
+        self.img.set_array(img)
+        self.bt = QPushButton("영역 설정 완료")
+
+        layout = QVBoxLayout()
+        layout.addWidget(label)
+        layout.addWidget(self.img)
+        layout.addWidget(self.bt)
+        self.setLayout(layout)
+
+        self.setWindowTitle("분석 영역 설정")
+        self.setWindowModality(Qt.WindowModality.ApplicationModal)
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            point = event.position()
+            point = self.img.img_label.mapFromParent(point)
+            x = point.x()-self.img.pos().x()
+            y = point.y()-self.img.pos().y()
+            if 0 < x < self.img_size[1] and 0 < y < self.img_size[0]:
+                new_point = QPoint(point.x()-self.img.pos().x(), point.y()-self.img.pos().y())
+                self.img.img_label.polygon_points.append(new_point)
+                if len(self.img.img_label.polygon_points) >= 3:
+                    self.img.img_label.repaint()
+            else:
+                get_logger().error("영역 설정 화면에서 잘못된 좌표를 클릭하였습니다.")
 
 
 class MainWidget(QWidget):
@@ -96,10 +131,13 @@ class MainWidget(QWidget):
         try:
             ml = MediaLoader(path, logger=get_logger(), realtime=False)
             ml.start()
+            f = None
             for _ in range(2):
                 f = ml.get_frame()
-            cv2.imshow('_', f)
-        except:
+            set_dialog = SetAreaDialog(img=f, parent=self)
+            set_dialog.show()
+        except Exception as e:
+            self.logger.warning(e)
             MsgDialog(parent=self,
                       msg="Not Exist Input File.\n"
                           "Please Check source path.",

@@ -11,6 +11,7 @@ class ImgDialog(QDialog):
         # self.img = QImage()
         layout = QVBoxLayout()
         self.img_label = QLabel()
+        self.img_pixmap = QPixmap()
         layout.addWidget(self.img_label)
 
         self.setLayout(layout)
@@ -18,10 +19,12 @@ class ImgDialog(QDialog):
         self.setWindowModality(modality)
 
     def set_image(self, img):
-        self.img_label.setPixmap(QPixmap.fromImage(img))
+        self.img_label.setPixmap(self.img_pixmap.fromImage(img))
 
     def set_file(self, path):
-        self.img_label.setPixmap(QPixmap.load(fileName=path))
+        self.img_pixmap.load(path)
+        self.img_label.setPixmap(self.img_pixmap)
+        self.img_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
 
 class ImgWidget(QWidget):
@@ -31,9 +34,15 @@ class ImgWidget(QWidget):
         # self.img = QImage()
         layout = QVBoxLayout()
         self.img_label = QLabel()
+        self.img_pixmap = QPixmap()
         layout.addWidget(self.img_label)
 
         self.setLayout(layout)
 
     def set_image(self, img):
-        self.img_label.setPixmap(QPixmap.fromImage(img))
+        self.img_label.setPixmap(self.img_pixmap.fromImage(img))
+
+    def set_file(self, path):
+        self.img_pixmap.load(path)
+        self.img_label.setPixmap(self.img_pixmap)
+        self.img_label.setAlignment(Qt.AlignmentFlag.AlignCenter)

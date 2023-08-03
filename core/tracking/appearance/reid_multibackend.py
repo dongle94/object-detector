@@ -8,7 +8,7 @@ from collections import OrderedDict, namedtuple
 from os.path import exists as file_exists
 
 from utils.logger import get_logger
-from ..utils.torch_utils import select_device
+from ..tracking_utils.torch_utils import select_device
 
 from .reid_model_factory import (
     show_downloadable_models,

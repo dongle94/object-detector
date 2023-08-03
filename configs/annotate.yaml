@@ -17,7 +17,7 @@ TRACK_HALF: false
 # Logger
 LOG_LEVEL: 'debug'
 CONSOLE_LOG: true
-LOGGER_NAME: "OBJ"
+LOGGER_NAME: "annotation"
 FILE_LOG: true
 LOG_FILE_DIR: './log/'
 LOG_FILE_COUNTER: 10

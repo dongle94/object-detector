@@ -167,17 +167,18 @@ class Homogenus(object):
         self.input = self.graph.get_tensor_by_name(u'input_images:0')
         self.output = self.graph.get_tensor_by_name(u'probs_op:0')
 
-    def infer(self, img):
-        accept_threshold = 0.9
-        crop_margin = 0.08
+    def infer(self, imgs):
 
-        probs_ob = self.sess.run(self.output, feed_dict={self.input: img})[0]
-        gender_id = np.argmax(probs_ob, axis=0)
+        probs_ob = self.sess.run(self.output, feed_dict={self.input: imgs}) #[0]
+        gender_id = np.argmax(probs_ob, axis=1)
 
-        gender_prob = probs_ob[gender_id]
+        ret = []
+        for idx, _id in enumerate(gender_id):
+            gender_prob = probs_ob[idx][_id]
+            gender_name = 'male' if _id == 0 else 'female'
+            ret.append([gender_name, gender_prob])
 
-        gender_name = 'male' if gender_id == 0 else 'female'
-        return [gender_name, gender_prob]
+        return ret
 
 
 def main(opt=None):
@@ -220,14 +221,15 @@ def main(opt=None):
         img_ids = 0
         anno_ids = 0
 
-    crop_margin = 0.04
+    crop_margin = opt.crop_margin
+    gender_calib_threshold = opt.calib_threshold
 
     is_out = False
     for IMGS_DIR in IMGS_DIRS:
         if is_out is True:
             break
 
-        show_img = False
+        show_img = True
         IMGS = os.listdir(IMGS_DIR)
         IMGS.sort()
         get_logger().info(f"process {IMGS_DIR} ..")
@@ -259,6 +261,8 @@ def main(opt=None):
             c_id = defaultdict(int)
             tmp_annos = []
             f1 = f0.copy()
+            gender_meta = []
+            gender_input = []
             for d in _det:
                 if d[4] < float(opt.confidence):
                     continue
@@ -275,14 +279,27 @@ def main(opt=None):
                 target_w = int(min((x2 + margin_w), im_w)) - offset_w
 
                 c_img0 = f0[offset_h:offset_h+target_h, offset_w:offset_w+target_w]
-                c_img1 = read_prep_image(c_img0)[np.newaxis]
+                c_img1 = read_prep_image(c_img0) #[np.newaxis]
 
-                ret = gender_classifier.infer(c_img1)
+                _g_inp = {
+                    'coord': [x1, y1, x2, y2],
+                    'width': w,
+                    'height': h,
+                }
+                gender_meta.append(_g_inp)
+                gender_input.append(c_img1)
+
+            gender_input = np.array(gender_input)
+            rets = gender_classifier.infer(gender_input)
+
+            for g_meta, ret in zip(gender_meta, rets):
+                x1, y1, x2, y2 = g_meta['coord']
+                w, h = g_meta['width'], g_meta['height']
                 if ret[0] == 'male':
                     txt_color = (255, 16, 16)
                     color = (255, 96, 96)
                     category_id = 0
-                    if ret[1] < 0.75:
+                    if ret[1] < gender_calib_threshold:
                         ret = ['female', ret[1]]
                         txt_color = (16, 16, 255)
                         color = (96, 96, 255)
@@ -345,8 +362,13 @@ def args_parse():
                         help='image directory path')
     parser.add_argument('-j', '--json_file', required=True,
                         help="if write this file, append annotations")
-    parser.add_argument('-c', '--confidence', default=0.3,
+    parser.add_argument('-c', '--confidence', default=0.3, type=float,
                         help="obj_detector confidence")
+    parser.add_argument('-cm', '--crop_margin', default=0.04, type=float,
+                        help="gender classification input image crop margin")
+    parser.add_argument('-ct', '--calib_threshold', default=0.7, type=float,
+                        help="gender classification score calibration threshold."
+                             "if male score is lower than ct, label change to female.")
     _args = parser.parse_args()
     return _args
 

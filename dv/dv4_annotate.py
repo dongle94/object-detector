@@ -1,6 +1,7 @@
 """
 datavoucher 4 - withyou
 human object classes by gender: male, female
+yolov5 x6 model + homogenus(gender classification) auto labeling version
 """
 import json
 import os

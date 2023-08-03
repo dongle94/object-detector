@@ -6,7 +6,8 @@ import numpy as np
 
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QDialog
 from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QLineEdit, QLabel, QPushButton
-from PySide6.QtCore import QSize, Qt
+from PySide6.QtWidgets import QFileDialog
+from PySide6.QtCore import QSize, Qt, Slot
 
 from pathlib import Path
 FILE = Path(__file__).resolve()
@@ -19,7 +20,9 @@ from utils.config import _C as cfg
 from utils.config import update_config
 from utils.logger import init_logger, get_logger
 
+from utils.medialoader import MediaLoader
 from gui.image import ImgWidget, ImgDialog
+from gui.widget import MsgDialog
 
 
 class MainWidget(QWidget):
@@ -37,6 +40,7 @@ class MainWidget(QWidget):
         self.el_source = QLineEdit()
         self.bt_find_source = QPushButton("동영상 파일 찾기")
         self.bt_set_area = QPushButton("분석 영역 설정")
+        self.bt_set_area.setDisabled(True)
 
         self.layer_0.addWidget(QLabel("미디어 소스: "))
         self.layer_0.addWidget(self.el_source)
@@ -63,6 +67,44 @@ class MainWidget(QWidget):
         self.main.addLayout(self.layer_0)
         self.main.addWidget(self.layer_1)
         self.main.addLayout(self.layer_2)
+
+        # signals & slots
+        self.bt_find_source.clicked.connect(self.find_video)
+        self.el_source.textEdited.connect(self.enable_bt_set_area)
+        self.bt_set_area.clicked.connect(self.set_area)
+
+    @Slot()
+    def find_video(self):
+        f_name = QFileDialog.getOpenFileName(parent=self, caption="비디오 파일 선택",
+                                             filter="All Files(*);;"
+                                                    "Videos(*.webm);;"
+                                                    "Videos(*.mp4 *.avi *m4v *.mpg *mpeg);;"
+                                                    "Videos(*.wmv *.mov *.mkv *.flv)")
+        self.el_source.setText(f_name[0])
+        self.bt_set_area.setDisabled(False)
+
+    @Slot()
+    def enable_bt_set_area(self):
+        if len(self.el_source.text()) == 0:
+            self.bt_set_area.setDisabled(True)
+        else:
+            self.bt_set_area.setDisabled(False)
+
+    @Slot()
+    def set_area(self):
+        path = self.el_source.text()
+        try:
+            ml = MediaLoader(path, logger=get_logger(), realtime=False)
+            ml.start()
+            for _ in range(2):
+                f = ml.get_frame()
+            cv2.imshow('_', f)
+        except:
+            MsgDialog(parent=self,
+                      msg="Not Exist Input File.\n"
+                          "Please Check source path.",
+                      title="Error Input")
+
 
 class WithYou(QMainWindow):
     def __init__(self, config=None):

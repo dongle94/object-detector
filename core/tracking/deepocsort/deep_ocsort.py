@@ -5,8 +5,8 @@
 import torch
 import numpy as np
 from ..motion.adapters import OCSortKalmanFilterAdapter
-from ..utils.association import *
-from ..utils.cmc import CameraMotionCompensation
+from ..tracking_utils.association import *
+from ..tracking_utils.cmc import CameraMotionCompensation
 from ..appearance.reid_multibackend import ReIDDetectMultiBackend
 
 

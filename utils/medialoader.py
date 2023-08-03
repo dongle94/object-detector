@@ -37,7 +37,7 @@ class MediaLoader(object):
 
         # Metadata
         self.cap = cap
-        if opt.MEDIA_OPT_AUTO is False:
+        if opt is not None and opt.MEDIA_OPT_AUTO is False:
             cap.set(cv2.CAP_PROP_FRAME_WIDTH, opt.MEDIA_WIDTH)
             cap.set(cv2.CAP_PROP_FRAME_HEIGHT, opt.MEDIA_HEIGHT)
             cap.set(cv2.CAP_PROP_FPS, opt.MEDIA_FPS)

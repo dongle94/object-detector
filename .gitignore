@@ -1,0 +1,15 @@
+# weight files
+weights
+
+# intelliJ
+.idea
+
+# log
+log
+
+# pyinstaller
+build
+dist
+
+# object traking
+cache

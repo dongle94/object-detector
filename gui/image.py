@@ -18,19 +18,20 @@ class ImgDialog(QDialog):
         self.setWindowTitle(title)
         self.setWindowModality(modality)
 
-    def set_image(self, img):
+    def set_image(self, img, scale=False):
         self.img_label.setPixmap(self.img_pixmap.fromImage(img))
+        self.img_label.setScaledContents(scale)
 
     def set_array(self, arr, scale=False):
         img = QImage(arr.data, arr.shape[1], arr.shape[0], QImage.Format.Format_BGR888)
         self.set_image(img)
-        if scale is True:
-            self.img_label.setScaledContents(True)
+        self.img_label.setScaledContents(scale)
 
-    def set_file(self, path):
+    def set_file(self, path, scale=False):
         self.img_pixmap.load(path)
         self.img_label.setPixmap(self.img_pixmap)
         self.img_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.img_label.setScaledContents(scale)
 
 
 class ImgWidget(QWidget):
@@ -45,19 +46,20 @@ class ImgWidget(QWidget):
 
         self.setLayout(layout)
 
-    def set_image(self, img):
+    def set_image(self, img, scale=False):
         self.img_label.setPixmap(self.img_pixmap.fromImage(img))
+        self.img_label.setScaledContents(scale)
 
     def set_array(self, arr, scale=False):
         img = QImage(arr.data, arr.shape[1], arr.shape[0], QImage.Format.Format_BGR888)
         self.set_image(img)
-        if scale is True:
-            self.img_label.setScaledContents(True)
+        self.img_label.setScaledContents(scale)
 
-    def set_file(self, path):
+    def set_file(self, path, scale=False):
         self.img_pixmap.load(path)
         self.img_label.setPixmap(self.img_pixmap)
         self.img_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.img_label.setScaledContents(scale)
 
 
 class PolygonOverlayLabel(QLabel):

@@ -176,20 +176,19 @@ class MainWidget(QWidget):
                       title="Error Input")
 
     def set_image_area(self, img, polygons, f_size):
-        img_size = f_size
-        lbl_size = self.layer_1.img_label.size()
+        img_size = (f_size[1], f_size[0])
+        lbl_size = (self.layer_1.img_label.size().width(), self.layer_1.img_label.size().height())
 
         self.layer_1.set_array(img, scale=True)
         for polygon in polygons:
             p_list = []
             for point in polygon.exterior.coords[:-1]:
-                new_point = QPoint(point[0], point[1])
+                orig_x, orig_y = point[0], point[1]
+                new_x, new_y = int(orig_x / img_size[0] * lbl_size[0]), int(orig_y / img_size[1] * lbl_size[1])
+                new_point = QPoint(new_x, new_y)
                 p_list.append(new_point)
             self.layer_1.img_label.polygon_points.append(p_list)
 
-        print(self.layer_1.img_label.polygon_points)
-        print(img_size, lbl_size)
-        print(polygons)
         self.layer_1.resize(img.shape[1], img.shape[0])
         self.layer_1.img_label.repaint()
 

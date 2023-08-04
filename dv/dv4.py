@@ -103,12 +103,14 @@ class MainWidget(QWidget):
         self.el_source = QLineEdit()
         self.bt_find_source = QPushButton("동영상 파일 찾기")
         self.bt_set_area = QPushButton("분석 영역 설정")
+        self.bt_reset = QPushButton("초기화")
         self.bt_set_area.setDisabled(True)
 
         self.layer_0.addWidget(QLabel("미디어 소스: "))
         self.layer_0.addWidget(self.el_source)
         self.layer_0.addWidget(self.bt_find_source)
         self.layer_0.addWidget(self.bt_set_area)
+        self.layer_0.addWidget(self.bt_reset)
 
         # 2
         self.layer_1 = ImgWidget(parent=self, polygon=True)
@@ -135,6 +137,7 @@ class MainWidget(QWidget):
         self.bt_find_source.clicked.connect(self.find_video)
         self.el_source.textEdited.connect(self.enable_bt_set_area)
         self.bt_set_area.clicked.connect(self.set_area)
+        self.bt_reset.clicked.connect(self.reset)
 
         # Op
         self.analysis_area = []
@@ -191,6 +194,14 @@ class MainWidget(QWidget):
 
         self.layer_1.resize(img.shape[1], img.shape[0])
         self.layer_1.img_label.repaint()
+
+    @Slot()
+    def reset(self):
+        self.layer_1.set_file('./data/images/default-video.png')
+        self.analysis_area = []
+
+        self.layer_1.img_label.polygon_points = []
+        self.set_dialog = None
 
 class WithYou(QMainWindow):
     def __init__(self, config=None):

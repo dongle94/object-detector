@@ -21,9 +21,11 @@ class ImgDialog(QDialog):
     def set_image(self, img):
         self.img_label.setPixmap(self.img_pixmap.fromImage(img))
 
-    def set_array(self, arr):
+    def set_array(self, arr, scale=False):
         img = QImage(arr.data, arr.shape[1], arr.shape[0], QImage.Format.Format_BGR888)
         self.set_image(img)
+        if scale is True:
+            self.img_label.setScaledContents(True)
 
     def set_file(self, path):
         self.img_pixmap.load(path)
@@ -46,9 +48,11 @@ class ImgWidget(QWidget):
     def set_image(self, img):
         self.img_label.setPixmap(self.img_pixmap.fromImage(img))
 
-    def set_array(self, arr):
+    def set_array(self, arr, scale=False):
         img = QImage(arr.data, arr.shape[1], arr.shape[0], QImage.Format.Format_BGR888)
         self.set_image(img)
+        if scale is True:
+            self.img_label.setScaledContents(True)
 
     def set_file(self, path):
         self.img_pixmap.load(path)
@@ -67,14 +71,13 @@ class PolygonOverlayLabel(QLabel):
 
         qp = QPainter()
         qp.begin(self)
-        if len(self.polygon_points) >= 3:
-            self.darw_polygon(qp)
-
+        for polygon_p in self.polygon_points:
+            self.draw_polygon(qp, polygon_p)
+            # self.setScaledContents(True)
         qp.end()
 
-    def darw_polygon(self, qp):
-        points1 = self.polygon_points
-        polygon1 = QPolygon(points1)
+    def draw_polygon(self, qp, points):
+        polygon = QPolygon(points)
 
         # line
         qp.setPen(QPen(QColor(96, 96, 255), 3))
@@ -83,4 +86,4 @@ class PolygonOverlayLabel(QLabel):
         qp.setBrush(QBrush(QColor(196, 196, 255, 96)))
 
         # draw
-        qp.drawPolygon(polygon1)
+        qp.drawPolygon(polygon)

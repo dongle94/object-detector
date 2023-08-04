@@ -8,7 +8,7 @@ import shapely
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QDialog
 from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QLineEdit, QLabel, QPushButton
 from PySide6.QtWidgets import QFileDialog
-from PySide6.QtCore import QSize, Qt, Slot, QPoint
+from PySide6.QtCore import QSize, Qt, Slot, QPoint, QThread
 from PySide6.QtGui import QMouseEvent
 
 from pathlib import Path
@@ -25,6 +25,11 @@ from utils.logger import init_logger, get_logger
 from utils.medialoader import MediaLoader
 from gui.image import ImgWidget
 from gui.widget import MsgDialog
+
+
+class AnalysisThread(QThread):
+    def __init__(self, parent):
+        super().__init__(parent=parent)
 
 
 class SetAreaDialog(QDialog):
@@ -125,6 +130,9 @@ class MainWidget(QWidget):
         self.layer_2.addWidget(self.bt_start)
         self.layer_2.addWidget(self.bt_stop)
         self.layer_2.addWidget(self.bt_result)
+        self.bt_start.setDisabled(True)
+        self.bt_stop.setDisabled(True)
+        self.bt_result.setDisabled(True)
 
         # main layout
         self.main = QVBoxLayout()
@@ -152,12 +160,24 @@ class MainWidget(QWidget):
         self.el_source.setText(f_name[0])
         self.bt_set_area.setDisabled(False)
 
+        self.bt_start.setDisabled(False)
+        self.bt_stop.setDisabled(False)
+        self.bt_result.setDisabled(False)
+
     @Slot()
     def enable_bt_set_area(self):
         if len(self.el_source.text()) == 0:
             self.bt_set_area.setDisabled(True)
+
+            self.bt_start.setDisabled(True)
+            self.bt_stop.setDisabled(True)
+            self.bt_result.setDisabled(True)
         else:
             self.bt_set_area.setDisabled(False)
+
+            self.bt_start.setDisabled(False)
+            self.bt_stop.setDisabled(False)
+            self.bt_result.setDisabled(False)
 
     @Slot()
     def set_area(self):
@@ -195,6 +215,11 @@ class MainWidget(QWidget):
         self.layer_1.resize(img.shape[1], img.shape[0])
         self.layer_1.img_label.repaint()
 
+        # if button state is disabled, enable button when you set area.
+        self.bt_start.setDisabled(False)
+        self.bt_stop.setDisabled(False)
+        self.bt_result.setDisabled(False)
+
     @Slot()
     def reset(self):
         self.layer_1.set_file('./data/images/default-video.png')
@@ -202,6 +227,11 @@ class MainWidget(QWidget):
 
         self.layer_1.img_label.polygon_points = []
         self.set_dialog = None
+
+        self.bt_start.setDisabled(True)
+        self.bt_stop.setDisabled(True)
+        self.bt_result.setDisabled(True)
+
 
 class WithYou(QMainWindow):
     def __init__(self, config=None):

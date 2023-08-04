@@ -3,6 +3,7 @@ import sys
 import argparse
 import cv2
 import numpy as np
+import shapely
 
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QDialog
 from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QLineEdit, QLabel, QPushButton
@@ -22,7 +23,7 @@ from utils.config import update_config
 from utils.logger import init_logger, get_logger
 
 from utils.medialoader import MediaLoader
-from gui.image import ImgWidget, ImgDialog
+from gui.image import ImgWidget
 from gui.widget import MsgDialog
 
 
@@ -32,6 +33,7 @@ class SetAreaDialog(QDialog):
 
         label = QLabel("3개 이상의 점을 찍어 영역을 설정해 주세요.")
         self.img_size = img.shape
+        self.frame = img
         self.img = ImgWidget(parent=self, polygon=True)
         self.img.set_array(img)
         self.bt = QPushButton("영역 설정 완료")
@@ -45,6 +47,12 @@ class SetAreaDialog(QDialog):
         self.setWindowTitle("분석 영역 설정")
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
 
+        self.polygons = []
+        self.polygon = []
+
+        # signals & slots
+        self.bt.clicked.connect(self.click_setArea)
+
     def mousePressEvent(self, event: QMouseEvent) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
             point = event.position()
@@ -53,12 +61,31 @@ class SetAreaDialog(QDialog):
             y = point.y()-self.img.pos().y()
             if 0 < x < self.img_size[1] and 0 < y < self.img_size[0]:
                 new_point = QPoint(point.x()-self.img.pos().x(), point.y()-self.img.pos().y())
-                self.img.img_label.polygon_points.append(new_point)
-                if len(self.img.img_label.polygon_points) >= 3:
-                    self.img.img_label.repaint()
+
+                self.polygon.append(new_point)
+                if len(self.polygon) == 3:
+                    self.img.img_label.polygon_points.append(self.polygon)
+                elif len(self.polygon) > 3:
+                    self.img.img_label.polygon_points[-1] = self.polygon
+                self.img.img_label.repaint()
+
             else:
                 get_logger().error("영역 설정 화면에서 잘못된 좌표를 클릭하였습니다.")
 
+    def click_setArea(self):
+        # 창은 숨기기
+        self.hide()
+        # 폴리곤 인스턴스 셋팅
+        p_list = [p.toTuple() for p in self.polygon]
+        polygon = shapely.Polygon(p_list)
+        self.polygons.append(polygon)
+
+        # Main Widget 으로 전달해주기
+        main_widget = self.parent()
+        main_widget.analysis_area.append(polygon)
+        main_widget.set_image_area(self.frame, self.polygons, f_size=self.img_size)
+        # 초기화
+        self.polygon = []
 
 class MainWidget(QWidget):
     def __init__(self, cfg, parent=None):
@@ -69,6 +96,7 @@ class MainWidget(QWidget):
         self.logger = get_logger()
         self.logger.info("Create Main Widget - Start")
         self.sbar = self.parent().statusBar()
+        self.set_dialog = None
 
         # 1
         self.layer_0 = QHBoxLayout()
@@ -83,7 +111,7 @@ class MainWidget(QWidget):
         self.layer_0.addWidget(self.bt_set_area)
 
         # 2
-        self.layer_1 = ImgWidget(parent=self)
+        self.layer_1 = ImgWidget(parent=self, polygon=True)
         self.layer_1.set_file('./data/images/default-video.png')
 
         # 3
@@ -107,6 +135,9 @@ class MainWidget(QWidget):
         self.bt_find_source.clicked.connect(self.find_video)
         self.el_source.textEdited.connect(self.enable_bt_set_area)
         self.bt_set_area.clicked.connect(self.set_area)
+
+        # Op
+        self.analysis_area = []
 
     @Slot()
     def find_video(self):
@@ -134,8 +165,9 @@ class MainWidget(QWidget):
             f = None
             for _ in range(2):
                 f = ml.get_frame()
-            set_dialog = SetAreaDialog(img=f, parent=self)
-            set_dialog.show()
+            if self.set_dialog is None:
+                self.set_dialog = SetAreaDialog(img=f, parent=self)
+            self.set_dialog.show()
         except Exception as e:
             self.logger.warning(e)
             MsgDialog(parent=self,
@@ -143,6 +175,23 @@ class MainWidget(QWidget):
                           "Please Check source path.",
                       title="Error Input")
 
+    def set_image_area(self, img, polygons, f_size):
+        img_size = f_size
+        lbl_size = self.layer_1.img_label.size()
+
+        self.layer_1.set_array(img, scale=True)
+        for polygon in polygons:
+            p_list = []
+            for point in polygon.exterior.coords[:-1]:
+                new_point = QPoint(point[0], point[1])
+                p_list.append(new_point)
+            self.layer_1.img_label.polygon_points.append(p_list)
+
+        print(self.layer_1.img_label.polygon_points)
+        print(img_size, lbl_size)
+        print(polygons)
+        self.layer_1.resize(img.shape[1], img.shape[0])
+        self.layer_1.img_label.repaint()
 
 class WithYou(QMainWindow):
     def __init__(self, config=None):

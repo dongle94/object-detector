@@ -22,15 +22,72 @@ from utils.config import _C as cfg
 from utils.config import update_config
 from utils.logger import init_logger, get_logger
 
-from utils.medialoader import MediaLoader
+from utils.medialoader import MediaLoader, check_sources
 from gui.image import ImgWidget
 from gui.widget import MsgDialog
 
+from core.obj_detectors import ObjectDetector
+
 
 class AnalysisThread(QThread):
-    def __init__(self, parent):
+    def __init__(self, parent, input_path=None, detector=None, polygons=[]):
         super().__init__(parent=parent)
+        self.logger = get_logger()
+        self.logger.info("Create AnalysisThread.")
 
+        self.sbar = self.parent().sbar
+        self.polygons = polygons
+
+        is_file, is_url, is_webcam = check_sources(input_path)
+        realtime = True
+        if is_url or is_webcam:
+            realtime = True
+        elif is_webcam:
+            realtime = False
+        self.medialoader = MediaLoader(source=input_path, realtime=realtime)
+        self.medialoader.start()
+        self.medialoader.pause()
+
+        self.detector = detector
+
+        self.viewer = self.parent().layer_1
+
+        self.stop = False
+
+    def run(self):
+        self.logger.info("영상 분석 시작")
+        self.sbar.showMessage("영상 분석 시작")
+
+        self.medialoader.restart()
+        self.stop = False
+
+        while True:
+            frame = self.medialoader.get_frame()
+            if frame is None or self.stop is True:
+                break
+
+            im = self.detector.preprocess(frame)
+            _pred = self.detector.detect(im)
+            _pred, _det = self.detector.postprocess(_pred)
+
+            boxes = []
+            for _d in _det:
+                x1, y1, x2, y2 = _d[:4]
+                w, h = int(x2-x1), int(y2-y1)
+                bx, by = int(x1 + 0.5 * w), int(y1 + 0.9 * h)
+                bench_point = shapely.Point(bx, by)
+                for polygon in self.polygons:
+                    if polygon.contains(bench_point):
+                        cv2.line(frame, (bx, by), (bx, by),
+                                 (224, 96, 255), 5, cv2.LINE_AA)
+                        boxes.append(_d)
+                        break
+            for b in boxes:
+                x1, y1, x2, y2 = map(int, b[:4])
+                cv2.rectangle(frame, (x1, y1), (x2, y2),
+                              color=(96, 216, 96),
+                              thickness=2, lineType=cv2.LINE_AA)
+            self.viewer.set_array(frame, scale=True)
 
 class SetAreaDialog(QDialog):
     def __init__(self, img, parent=None):
@@ -92,6 +149,7 @@ class SetAreaDialog(QDialog):
         # 초기화
         self.polygon = []
 
+
 class MainWidget(QWidget):
     def __init__(self, cfg, parent=None):
         super().__init__(parent=parent)
@@ -146,9 +204,13 @@ class MainWidget(QWidget):
         self.el_source.textEdited.connect(self.enable_bt_set_area)
         self.bt_set_area.clicked.connect(self.set_area)
         self.bt_reset.clicked.connect(self.reset)
+        self.bt_start.clicked.connect(self.start_analysis)
 
         # Op
         self.analysis_area = []
+
+        self.obj_detector = ObjectDetector(cfg=self.config)
+        self.analysis_thread = None
 
     @Slot()
     def find_video(self):
@@ -160,9 +222,7 @@ class MainWidget(QWidget):
         self.el_source.setText(f_name[0])
         self.bt_set_area.setDisabled(False)
 
-        self.bt_start.setDisabled(False)
-        self.bt_stop.setDisabled(False)
-        self.bt_result.setDisabled(False)
+        self.sbar.showMessage("분석 시작을 위해서 분석 영역 설정을 해 주세요.")
 
     @Slot()
     def enable_bt_set_area(self):
@@ -175,9 +235,7 @@ class MainWidget(QWidget):
         else:
             self.bt_set_area.setDisabled(False)
 
-            self.bt_start.setDisabled(False)
-            self.bt_stop.setDisabled(False)
-            self.bt_result.setDisabled(False)
+            self.sbar.showMessage("분석 시작을 위해서 분석 영역 설정을 해 주세요.")
 
     @Slot()
     def set_area(self):
@@ -220,6 +278,14 @@ class MainWidget(QWidget):
         self.bt_stop.setDisabled(False)
         self.bt_result.setDisabled(False)
 
+        if self.analysis_thread is None:
+            self.analysis_thread = AnalysisThread(
+                parent=self,
+                input_path=self.el_source.text(),
+                detector=self.obj_detector,
+                polygons=self.analysis_area
+            )
+
     @Slot()
     def reset(self):
         self.layer_1.set_file('./data/images/default-video.png')
@@ -228,9 +294,26 @@ class MainWidget(QWidget):
         self.layer_1.img_label.polygon_points = []
         self.set_dialog = None
 
+        self.analysis_thread = None
+
         self.bt_start.setDisabled(True)
         self.bt_stop.setDisabled(True)
         self.bt_result.setDisabled(True)
+
+        self.logger.info("Disable button / img dialog and analysis thread be empty")
+
+    @Slot()
+    def start_analysis(self):
+        self.logger.info("Start analysis")
+
+        self.analysis_thread.start()
+
+    @Slot()
+    def stop_analysis(self):
+        self.logger.info("Stop analysis")
+
+        self.analysis_thread.stop = True
+        self.analysis_thread.exit()
 
 
 class WithYou(QMainWindow):

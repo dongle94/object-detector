@@ -63,6 +63,8 @@ class AnalysisThread(QThread):
 
         while True:
             frame = self.medialoader.get_frame()
+            if frame.shape[0] >= 1080:
+                frame = cv2.resize(frame, (int(frame.shape[1]*0.8), int(frame.shape[0]*0.8)))
             if frame is None or self.stop is True:
                 break
 
@@ -89,15 +91,18 @@ class AnalysisThread(QThread):
                               thickness=2, lineType=cv2.LINE_AA)
             self.viewer.set_array(frame, scale=True)
 
+
 class SetAreaDialog(QDialog):
     def __init__(self, img, parent=None):
         super().__init__(parent=parent)
 
         label = QLabel("3개 이상의 점을 찍어 영역을 설정해 주세요.")
-        self.img_size = img.shape
         self.frame = img
+        if img.shape[0] >= 1080:
+            img = cv2.resize(img, (int(img.shape[1] * 0.8), int(img.shape[0] * 0.8)))
+        self.img_size = img.shape
         self.img = ImgWidget(parent=self, polygon=True)
-        self.img.set_array(img)
+        self.img.set_array(img) #, scale=True)
         self.bt = QPushButton("영역 설정 완료")
 
         layout = QVBoxLayout()
@@ -257,10 +262,14 @@ class MainWidget(QWidget):
                       title="Error Input")
 
     def set_image_area(self, img, polygons, f_size):
+        # image size check
         img_size = (f_size[1], f_size[0])
+
+        # img label size check
+        self.layer_1.set_array(img, scale=True)
         lbl_size = (self.layer_1.img_label.size().width(), self.layer_1.img_label.size().height())
 
-        self.layer_1.set_array(img, scale=True)
+        # adjust polygon points
         for polygon in polygons:
             p_list = []
             for point in polygon.exterior.coords[:-1]:
@@ -326,7 +335,7 @@ class WithYou(QMainWindow):
 
         # resize window
         self.geo = self.screen().availableGeometry()
-        self.resize(QSize(self.geo.width() * 0.7, self.geo.height() * 0.7))
+        self.setFixedSize(self.geo.width() * 0.8, self.geo.height() * 0.8)
 
         # Status Bar
         self.sbar = self.statusBar()

@@ -2,6 +2,7 @@ import os
 import sys
 import argparse
 import cv2
+import time
 import numpy as np
 import shapely
 
@@ -38,36 +39,48 @@ class AnalysisThread(QThread):
         self.sbar = self.parent().sbar
         self.polygons = polygons
 
-        is_file, is_url, is_webcam = check_sources(input_path)
-        realtime = True
-        if is_url or is_webcam:
-            realtime = True
-        elif is_webcam:
-            realtime = False
-        self.medialoader = MediaLoader(source=input_path, realtime=realtime)
-        self.medialoader.start()
-        self.medialoader.pause()
+        self.is_file, self.is_url, self.is_webcam = check_sources(input_path)
+        self.input_path = input_path
+        if self.is_url or self.is_file:
+            realtime = True if self.is_url else False   # else is is_file
+            self.medialoader = MediaLoader(source=input_path, realtime=realtime)
+            self.logger.info(f"Non Webcam Medialoader source: {input_path} / realtime: {realtime}")
+            self.medialoader.start()
+            self.medialoader.pause()
 
         self.detector = detector
 
         self.viewer = self.parent().layer_1
 
-        self.stop = False
+        self.stop_run = False
+
+        # analysis logging
+        self.f_cnt = 0
+        self.log_interval = self.parent().config.CONSOLE_LOG_INTERVAL
+        self.ts = [0., 0., 0., ]
 
     def run(self):
         self.logger.info("영상 분석 시작")
         self.sbar.showMessage("영상 분석 시작")
-
-        self.medialoader.restart()
-        self.stop = False
+        if self.is_webcam:
+            self.medialoader = MediaLoader(source=self.input_path, realtime=True)
+            self.logger.info(f"Webcam Medialoader source: {self.input_path} / realtime: {True}")
+            self.medialoader.start()
+        else:
+            self.medialoader.restart()
+        self.stop_run = False
+        fps = self.medialoader.fps
+        w_time = 1 / fps
 
         while True:
             frame = self.medialoader.get_frame()
-            if frame.shape[0] >= 1080:
-                frame = cv2.resize(frame, (int(frame.shape[1]*0.8), int(frame.shape[0]*0.8)))
-            if frame is None or self.stop is True:
+            if frame is None or self.stop_run is True:
                 break
 
+            if frame.shape[0] >= 1080:
+                frame = cv2.resize(frame, (int(frame.shape[1]*0.8), int(frame.shape[0]*0.8)))
+
+            t0 = time.time()
             im = self.detector.preprocess(frame)
             _pred = self.detector.detect(im)
             _pred, _det = self.detector.postprocess(_pred)
@@ -84,12 +97,38 @@ class AnalysisThread(QThread):
                                  (224, 96, 255), 5, cv2.LINE_AA)
                         boxes.append(_d)
                         break
+            t1 = time.time()
+
             for b in boxes:
                 x1, y1, x2, y2 = map(int, b[:4])
                 cv2.rectangle(frame, (x1, y1), (x2, y2),
                               color=(96, 216, 96),
                               thickness=2, lineType=cv2.LINE_AA)
+
             self.viewer.set_array(frame, scale=True)
+            t2 = time.time()
+
+            # calculate time
+            self.ts[0] += (t1 - t0)
+            self.ts[1] += (t2 - t1)
+            # self.ts[2] += (t3 - t2)
+
+            self.f_cnt += 1
+            if self.f_cnt % self.log_interval == 0:
+                self.logger.debug(
+                    f"[{self.f_cnt} Frames] det: {self.ts[0] / self.f_cnt:.4f} / "
+                    # f"tracking: {self.ts[1] / self.f_cnt:.4f} / "
+                    f"visualize: {self.ts[1] / self.f_cnt:.4f}")
+            if (t2 - t0) + 0.001 < w_time:
+                s_time = w_time - (t2 - t0) - 0.001
+                time.sleep(s_time)
+
+        self.sbar.showMessage("영상 분석 중지")
+        get_logger().info("Analysis Thraed - 영상 분석 종료")
+
+    def stop(self):
+        self.medialoader.stop()
+        del self.medialoader
 
 
 class SetAreaDialog(QDialog):
@@ -210,6 +249,7 @@ class MainWidget(QWidget):
         self.bt_set_area.clicked.connect(self.set_area)
         self.bt_reset.clicked.connect(self.reset)
         self.bt_start.clicked.connect(self.start_analysis)
+        self.bt_stop.clicked.connect(self.stop_analysis)
 
         # Op
         self.analysis_area = []
@@ -254,6 +294,7 @@ class MainWidget(QWidget):
             if self.set_dialog is None:
                 self.set_dialog = SetAreaDialog(img=f, parent=self)
             self.set_dialog.show()
+            ml.stop()
         except Exception as e:
             self.logger.warning(e)
             MsgDialog(parent=self,
@@ -303,6 +344,9 @@ class MainWidget(QWidget):
         self.layer_1.img_label.polygon_points = []
         self.set_dialog = None
 
+        if self.analysis_thread is not None:
+            self.analysis_thread.stop_run = True
+            self.analysis_thread.stop()
         self.analysis_thread = None
 
         self.bt_start.setDisabled(True)
@@ -321,7 +365,7 @@ class MainWidget(QWidget):
     def stop_analysis(self):
         self.logger.info("Stop analysis")
 
-        self.analysis_thread.stop = True
+        self.analysis_thread.stop_run = True
         self.analysis_thread.exit()
 
 

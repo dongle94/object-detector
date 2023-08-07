@@ -27,11 +27,13 @@ from utils.medialoader import MediaLoader, check_sources
 from gui.image import ImgWidget
 from gui.widget import MsgDialog
 
+from core.bbox import BBox
 from core.obj_detectors import ObjectDetector
+from core.tracking import ObjectTracker
 
 
 class AnalysisThread(QThread):
-    def __init__(self, parent, input_path=None, detector=None, polygons=[]):
+    def __init__(self, parent, input_path=None, detector=None, tracker=None, polygons=[]):
         super().__init__(parent=parent)
         self.logger = get_logger()
         self.logger.info("Create AnalysisThread.")
@@ -48,7 +50,9 @@ class AnalysisThread(QThread):
             self.medialoader.start()
             self.medialoader.pause()
 
+        # analysis module
         self.detector = detector
+        self.tracker = tracker
 
         self.viewer = self.parent().layer_1
 
@@ -86,6 +90,7 @@ class AnalysisThread(QThread):
             _pred, _det = self.detector.postprocess(_pred)
 
             boxes = []
+            # analysis area filtering
             for _d in _det:
                 x1, y1, x2, y2 = _d[:4]
                 w, h = int(x2-x1), int(y2-y1)
@@ -97,16 +102,41 @@ class AnalysisThread(QThread):
                                  (224, 96, 255), 5, cv2.LINE_AA)
                         boxes.append(_d)
                         break
+            boxes = np.array(boxes)
             t1 = time.time()
 
-            for b in boxes:
-                x1, y1, x2, y2 = map(int, b[:4])
-                cv2.rectangle(frame, (x1, y1), (x2, y2),
-                              color=(96, 216, 96),
-                              thickness=2, lineType=cv2.LINE_AA)
+            _boxes = []
+            # tracking and creating BBox instance
+            if len(boxes):
+                track_ret = self.tracker.update(boxes, frame)
+                if len(track_ret):
+                    t_boxes = track_ret[:, 0:4].astype(np.int32)
+                    t_ids = track_ret[:, 4].astype(np.int32)
+                    t_confs = track_ret[:, 5]
+                    t_classes = track_ret[:, 6]
+                    for xyxy, _id, conf, cls in zip(t_boxes, t_ids, t_confs, t_classes):
+                        bbox = BBox(tlbr=xyxy,
+                                    class_index=int(cls),
+                                    class_name=self.detector.names[int(cls)],
+                                    conf=conf,
+                                    imgsz=frame.shape)
+                        bbox.tracking_id = _id
+                        _boxes.append(bbox)
+            t2 = time.time()
+
+            # visualize
+            for b in _boxes:
+                x1, y1, x2, y2 = b.x1, b.y1, b.x2, b.y2
+                if b.tracking_id != -1:
+                    cv2.rectangle(frame, (x1, y1), (x2, y2),
+                                  color=(96, 216, 96),
+                                  thickness=2, lineType=cv2.LINE_AA)
+                    cv2.putText(frame, text=f"({b.class_name})ID: {b.tracking_id}",
+                                org=(b.x1, b.y1+10), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5,
+                                color=(96, 96, 216), thickness=2)
 
             self.viewer.set_array(frame, scale=True)
-            t2 = time.time()
+
 
             # calculate time
             self.ts[0] += (t1 - t0)
@@ -255,6 +285,7 @@ class MainWidget(QWidget):
         self.analysis_area = []
 
         self.obj_detector = ObjectDetector(cfg=self.config)
+        self.obj_tracker = ObjectTracker(cfg=self.config)
         self.analysis_thread = None
 
     @Slot()
@@ -333,19 +364,19 @@ class MainWidget(QWidget):
                 parent=self,
                 input_path=self.el_source.text(),
                 detector=self.obj_detector,
+                tracker=self.obj_tracker,
                 polygons=self.analysis_area
             )
 
     @Slot()
     def reset(self):
-        self.layer_1.set_file('./data/images/default-video.png')
         self.analysis_area = []
-
         self.layer_1.img_label.polygon_points = []
         self.set_dialog = None
 
         if self.analysis_thread is not None:
             self.analysis_thread.stop_run = True
+            time.sleep(0.1)
             self.analysis_thread.stop()
         self.analysis_thread = None
 
@@ -353,6 +384,7 @@ class MainWidget(QWidget):
         self.bt_stop.setDisabled(True)
         self.bt_result.setDisabled(True)
 
+        self.layer_1.set_file('./data/images/default-video.png')
         self.logger.info("Disable button / img dialog and analysis thread be empty")
 
     @Slot()

@@ -1,7 +1,8 @@
+import numpy
 
 from PySide6.QtWidgets import QWidget, QDialog, QLabel, QVBoxLayout
 from PySide6.QtGui import QImage, QPixmap, QPainter, QPolygon, QPen, QColor, QBrush, QPaintEvent
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 
 
 class ImgDialog(QDialog):
@@ -63,6 +64,7 @@ class ImgWidget(QWidget):
 
 
 class PolygonOverlayLabel(QLabel):
+    draw = Signal(numpy.ndarray, bool)
     def __init__(self):
         super().__init__()
 

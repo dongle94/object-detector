@@ -135,20 +135,20 @@ class AnalysisThread(QThread):
                                 org=(b.x1, b.y1+10), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5,
                                 color=(96, 96, 216), thickness=2)
 
-            self.viewer.set_array(frame, scale=True)
-
+            self.parent().layer_1.img_label.draw.emit(frame, True)
+            t3 = time.time()
 
             # calculate time
             self.ts[0] += (t1 - t0)
             self.ts[1] += (t2 - t1)
-            # self.ts[2] += (t3 - t2)
+            self.ts[2] += (t3 - t2)
 
             self.f_cnt += 1
             if self.f_cnt % self.log_interval == 0:
                 self.logger.debug(
                     f"[{self.f_cnt} Frames] det: {self.ts[0] / self.f_cnt:.4f} / "
-                    # f"tracking: {self.ts[1] / self.f_cnt:.4f} / "
-                    f"visualize: {self.ts[1] / self.f_cnt:.4f}")
+                    f"tracking: {self.ts[1] / self.f_cnt:.4f} / "
+                    f"visualize: {self.ts[2] / self.f_cnt:.4f}")
             if (t2 - t0) + 0.001 < w_time:
                 s_time = w_time - (t2 - t0) - 0.001
                 time.sleep(s_time)
@@ -280,6 +280,7 @@ class MainWidget(QWidget):
         self.bt_reset.clicked.connect(self.reset)
         self.bt_start.clicked.connect(self.start_analysis)
         self.bt_stop.clicked.connect(self.stop_analysis)
+        self.layer_1.img_label.draw.connect(self.draw_img)
 
         # Op
         self.analysis_area = []
@@ -399,6 +400,10 @@ class MainWidget(QWidget):
 
         self.analysis_thread.stop_run = True
         self.analysis_thread.exit()
+
+    @Slot()
+    def draw_img(self, img, scale=False):
+        self.layer_1.set_array(img, scale)
 
 
 class WithYou(QMainWindow):

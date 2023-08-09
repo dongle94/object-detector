@@ -5,6 +5,8 @@ import cv2
 import time
 import numpy as np
 import shapely
+from datetime import datetime, timedelta
+from collections import defaultdict
 
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QDialog
 from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QLineEdit, QLabel, QPushButton
@@ -32,6 +34,38 @@ from core.obj_detectors import ObjectDetector
 from core.tracking import ObjectTracker
 
 
+class ResultDialog(QDialog):
+    def __init__(self):
+        pass
+        # 존재하는 분석 결과 파일 읽어와서 보여주기
+
+
+class AnalysisResult(object):
+    def __init__(self, source):
+        self.data = {}
+        self.source = source
+
+
+    def init_analysis(self):
+        get_logger().info("AnalysisResult initialization.")
+        self.data = {
+            'source': self.source,
+            'start_time': datetime.now(),
+            'end_time': None,
+            'object_cnt': defaultdict(int),
+            'tts': defaultdict(float),
+            'checked_id': []
+        }
+
+    def stop_analysis(self):
+        pass
+
+    def save_result(self):
+        file_name = f'{datetime.now().strftime("%Y-%m-%dT%H:%M:%S")}.txt'
+        with open(file_name, mode='w', encoding='utf8') as f:
+            f.write("hello")
+
+
 class AnalysisThread(QThread):
     def __init__(self, parent, input_path=None, detector=None, tracker=None, polygons=[]):
         super().__init__(parent=parent)
@@ -44,7 +78,7 @@ class AnalysisThread(QThread):
         self.is_file, self.is_url, self.is_webcam = check_sources(input_path)
         self.input_path = input_path
         if self.is_url or self.is_file:
-            realtime = True if self.is_url else False   # else is is_file
+            realtime = True if self.is_url else True   # else is is_file
             self.medialoader = MediaLoader(source=input_path, realtime=realtime)
             self.logger.info(f"Non Webcam Medialoader source: {input_path} / realtime: {realtime}")
             self.medialoader.start()
@@ -55,8 +89,11 @@ class AnalysisThread(QThread):
         self.tracker = tracker
 
         self.viewer = self.parent().layer_1
-
+        self.analysis_result = AnalysisResult(input_path)
         self.stop_run = False
+
+        self.id_cnt = defaultdict(int)
+        self.t_box_data = {}
 
         # analysis logging
         self.f_cnt = 0
@@ -66,6 +103,7 @@ class AnalysisThread(QThread):
     def run(self):
         self.logger.info("영상 분석 시작")
         self.sbar.showMessage("영상 분석 시작")
+        self.analysis_result.init_analysis()
         if self.is_webcam:
             self.medialoader = MediaLoader(source=self.input_path, realtime=True)
             self.logger.info(f"Webcam Medialoader source: {self.input_path} / realtime: {True}")
@@ -115,13 +153,45 @@ class AnalysisThread(QThread):
                     t_confs = track_ret[:, 5]
                     t_classes = track_ret[:, 6]
                     for xyxy, _id, conf, cls in zip(t_boxes, t_ids, t_confs, t_classes):
-                        bbox = BBox(tlbr=xyxy,
-                                    class_index=int(cls),
-                                    class_name=self.detector.names[int(cls)],
-                                    conf=conf,
-                                    imgsz=frame.shape)
-                        bbox.tracking_id = _id
-                        _boxes.append(bbox)
+                        if _id != -1:
+                            bbox = BBox(tlbr=xyxy,
+                                        class_index=int(cls),
+                                        class_name=self.detector.names[int(cls)],
+                                        conf=conf,
+                                        imgsz=frame.shape)
+                            bbox.tracking_id = _id
+                            _boxes.append(bbox)
+
+                            # 분석결과 처리
+                            if self.id_cnt[_id] == 0:       # 첫 등장
+                                self.t_box_data[_id] = {
+                                    'class_index': int(cls),
+                                    'access_time': time.time()
+                                }
+                            elif self.id_cnt[_id] == 10:  # 실제 카운트 인정
+                                if _id not in self.analysis_result.data['checked_id']:
+                                    self.analysis_result.data['object_cnt'][bbox.class_name] += 1
+                                    self.analysis_result.data['checked_id'].append(_id)
+                                self.t_box_data[_id]['last_modified_time'] = time.time()
+                            elif self.id_cnt[_id] > 10:
+                                self.t_box_data[_id]['last_modified_time'] = time.time()
+                            self.id_cnt[_id] += 1
+
+            del_list = []
+            for _id, data in self.t_box_data.items():
+                if'last_modified_time' in data:
+                    if time.time() - self.t_box_data[_id]['last_modified_time'] > 10:   # 유효 박스 중 사라진 박스
+                        _class_idx = self.t_box_data[_id]['class_index']
+                        self.analysis_result.data['tts'][_class_idx] += (self.t_box_data[_id]['last_modified_time'] - self.t_box_data[_id]['access_time'])
+                        del_list.append(_id)
+                        print(_id, self.analysis_result.data)
+                else:       # 등장만하고 유효하지 않은 박스
+                    if time.time() - self.t_box_data[_id]['access_time'] > 10:
+                        del_list.append(_id)
+            for _id in del_list:
+                del self.id_cnt[_id]
+                del self.t_box_data[_id]
+
             t2 = time.time()
 
             # visualize
@@ -135,7 +205,7 @@ class AnalysisThread(QThread):
                                 org=(b.x1, b.y1+10), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5,
                                 color=(96, 96, 216), thickness=2)
 
-            self.parent().layer_1.img_label.draw.emit(frame, True)
+            self.viewer.img_label.draw.emit(frame, True)
             t3 = time.time()
 
             # calculate time
@@ -155,6 +225,18 @@ class AnalysisThread(QThread):
 
         self.sbar.showMessage("영상 분석 중지")
         get_logger().info("Analysis Thraed - 영상 분석 종료")
+
+    def stop_analysis(self):
+        self.analysis_result.data['end_time'] = datetime.now()
+        for _id, data in self.t_box_data.items():
+            if 'last_modified_time' in data:
+                _class_idx = self.t_box_data[_id]['class_index']
+                self.analysis_result.data['tts'][_class_idx] += (
+                            self.t_box_data[_id]['last_modified_time'] - self.t_box_data[_id]['access_time'])
+
+        self.id_cnt = defaultdict(int)
+        self.t_box_data = {}
+        print(self.analysis_result.data)
 
     def stop(self):
         self.medialoader.stop()
@@ -256,7 +338,7 @@ class MainWidget(QWidget):
         # 3
         self.layer_2 = QHBoxLayout()
         self.bt_start = QPushButton("분석 시작")
-        self.bt_stop = QPushButton("분석 중지")
+        self.bt_stop = QPushButton("분석 종료")
         self.bt_result = QPushButton("분석 결과 보기")
 
         self.layer_2.addWidget(self.bt_start)
@@ -400,6 +482,7 @@ class MainWidget(QWidget):
 
         self.analysis_thread.stop_run = True
         self.analysis_thread.exit()
+        self.analysis_thread.stop_analysis()
 
     @Slot()
     def draw_img(self, img, scale=False):

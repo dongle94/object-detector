@@ -559,6 +559,7 @@ class MainWidget(QWidget):
         result = ResultDialog(parent=self)
         result.show()
 
+
 class WithYou(QMainWindow):
     def __init__(self, config=None):
         super().__init__()

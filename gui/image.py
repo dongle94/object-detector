@@ -65,6 +65,7 @@ class ImgWidget(QWidget):
 
 class PolygonOverlayLabel(QLabel):
     draw = Signal(numpy.ndarray, bool)
+
     def __init__(self):
         super().__init__()
 

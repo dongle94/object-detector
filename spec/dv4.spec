@@ -5,8 +5,8 @@ block_cipher = None
 
 
 a = Analysis(
-    ['dv\\dv4.py'],
-    pathex=['.\\', '.\\core\\obj_detectors\\'],
+    ['../dv/dv4.py'],
+    pathex=['./', './core/obj_detectors/'],
     binaries=[],
     datas=[],
     hiddenimports=[],

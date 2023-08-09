@@ -5,12 +5,13 @@ import cv2
 import time
 import numpy as np
 import shapely
-from datetime import datetime, timedelta
+import json
+from datetime import datetime
 from collections import defaultdict
 
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QDialog
 from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QLineEdit, QLabel, QPushButton
-from PySide6.QtWidgets import QFileDialog
+from PySide6.QtWidgets import QFileDialog, QTabWidget
 from PySide6.QtCore import QSize, Qt, Slot, QPoint, QThread
 from PySide6.QtGui import QMouseEvent
 
@@ -35,9 +36,14 @@ from core.tracking import ObjectTracker
 
 
 class ResultDialog(QDialog):
-    def __init__(self):
-        pass
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+        self.setupUi()
         # 존재하는 분석 결과 파일 읽어와서 보여주기
+
+
+    def setupUi(self):
+        self.tabs = QTabWidget()
 
 
 class AnalysisResult(object):
@@ -50,7 +56,7 @@ class AnalysisResult(object):
         get_logger().info("AnalysisResult initialization.")
         self.data = {
             'source': self.source,
-            'start_time': datetime.now(),
+            'start_time': datetime.now().strftime("%Y-%m-%dT%H-%M-%S"),
             'end_time': None,
             'object_cnt': defaultdict(int),
             'tts': defaultdict(float),
@@ -58,12 +64,14 @@ class AnalysisResult(object):
         }
 
     def stop_analysis(self):
-        pass
-
-    def save_result(self):
-        file_name = f'{datetime.now().strftime("%Y-%m-%dT%H:%M:%S")}.txt'
-        with open(file_name, mode='w', encoding='utf8') as f:
-            f.write("hello")
+        # 분석 종료 버튼을 누르고 -> 분석 쓰레드 관련된 부분 정리 후 -> 분석 결과에 대한 처리
+        file_name = f'{self.data["end_time"]}.result'
+        file_name = os.path.abspath(os.path.join('./log', file_name))
+        if not os.path.exists(os.path.dirname(file_name)):
+            os.makedirs(os.path.dirname(file_name))
+        with open(file=file_name, mode='w', encoding='utf8') as outfile:
+            json.dump(self.data, outfile, indent=2)
+        get_logger().info(f"Save analysis result to {file_name}: {self.data}")
 
 
 class AnalysisThread(QThread):
@@ -166,12 +174,13 @@ class AnalysisThread(QThread):
                             if self.id_cnt[_id] == 0:       # 첫 등장
                                 self.t_box_data[_id] = {
                                     'class_index': int(cls),
+                                    'class_name': self.detector.names[int(cls)],
                                     'access_time': time.time()
                                 }
                             elif self.id_cnt[_id] == 10:  # 실제 카운트 인정
-                                if _id not in self.analysis_result.data['checked_id']:
+                                if int(_id) not in self.analysis_result.data['checked_id']:
                                     self.analysis_result.data['object_cnt'][bbox.class_name] += 1
-                                    self.analysis_result.data['checked_id'].append(_id)
+                                    self.analysis_result.data['checked_id'].append(int(_id))
                                 self.t_box_data[_id]['last_modified_time'] = time.time()
                             elif self.id_cnt[_id] > 10:
                                 self.t_box_data[_id]['last_modified_time'] = time.time()
@@ -181,10 +190,9 @@ class AnalysisThread(QThread):
             for _id, data in self.t_box_data.items():
                 if'last_modified_time' in data:
                     if time.time() - self.t_box_data[_id]['last_modified_time'] > 10:   # 유효 박스 중 사라진 박스
-                        _class_idx = self.t_box_data[_id]['class_index']
-                        self.analysis_result.data['tts'][_class_idx] += (self.t_box_data[_id]['last_modified_time'] - self.t_box_data[_id]['access_time'])
+                        _class_name = self.t_box_data[_id]['class_name']
+                        self.analysis_result.data['tts'][_class_name] += (self.t_box_data[_id]['last_modified_time'] - self.t_box_data[_id]['access_time'])
                         del_list.append(_id)
-                        print(_id, self.analysis_result.data)
                 else:       # 등장만하고 유효하지 않은 박스
                     if time.time() - self.t_box_data[_id]['access_time'] > 10:
                         del_list.append(_id)
@@ -227,16 +235,18 @@ class AnalysisThread(QThread):
         get_logger().info("Analysis Thraed - 영상 분석 종료")
 
     def stop_analysis(self):
-        self.analysis_result.data['end_time'] = datetime.now()
+        self.analysis_result.data['end_time'] = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
         for _id, data in self.t_box_data.items():
             if 'last_modified_time' in data:
-                _class_idx = self.t_box_data[_id]['class_index']
-                self.analysis_result.data['tts'][_class_idx] += (
+                _class_name = self.t_box_data[_id]['class_name']
+                self.analysis_result.data['tts'][_class_name] += (
                             self.t_box_data[_id]['last_modified_time'] - self.t_box_data[_id]['access_time'])
 
         self.id_cnt = defaultdict(int)
         self.t_box_data = {}
-        print(self.analysis_result.data)
+
+        # 분석 결과 종료 처리
+        self.analysis_result.stop_analysis()
 
     def stop(self):
         self.medialoader.stop()
@@ -309,7 +319,6 @@ class SetAreaDialog(QDialog):
 class MainWidget(QWidget):
     def __init__(self, cfg, parent=None):
         super().__init__(parent=parent)
-
         # init Widget
         self.config = cfg
         self.logger = get_logger()
@@ -362,6 +371,7 @@ class MainWidget(QWidget):
         self.bt_reset.clicked.connect(self.reset)
         self.bt_start.clicked.connect(self.start_analysis)
         self.bt_stop.clicked.connect(self.stop_analysis)
+        self.bt_result.clicked.connect(self.show_analysis)
         self.layer_1.img_label.draw.connect(self.draw_img)
 
         # Op
@@ -488,6 +498,10 @@ class MainWidget(QWidget):
     def draw_img(self, img, scale=False):
         self.layer_1.set_array(img, scale)
 
+    @Slot()
+    def show_analysis(self):
+        result = ResultDialog(parent=self)
+        result.show()
 
 class WithYou(QMainWindow):
     def __init__(self, config=None):

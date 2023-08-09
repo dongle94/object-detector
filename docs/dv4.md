@@ -5,7 +5,7 @@
 ### requirement
 - Python 3.8 (test version)
 - Windows or Linux OS
-  - Test OS: Windows 11
+  - Test OS: Windows 11, Ubuntu 20.04
 
 ```shell
 # install python package

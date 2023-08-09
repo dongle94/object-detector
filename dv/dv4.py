@@ -6,12 +6,13 @@ import time
 import numpy as np
 import shapely
 import json
+import glob
 from datetime import datetime
 from collections import defaultdict
 
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QDialog
 from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QLineEdit, QLabel, QPushButton
-from PySide6.QtWidgets import QFileDialog, QTabWidget
+from PySide6.QtWidgets import QFileDialog, QTabWidget, QTableWidget, QTableWidgetItem
 from PySide6.QtCore import QSize, Qt, Slot, QPoint, QThread
 from PySide6.QtGui import QMouseEvent
 
@@ -39,18 +40,64 @@ class ResultDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         self.setupUi()
-        # 존재하는 분석 결과 파일 읽어와서 보여주기
-
+        get_logger().info("View Analysis Result.")
 
     def setupUi(self):
+        self.setWindowModality(Qt.WindowModality.ApplicationModal)
+        self.setWindowTitle("분석 결과 보기")
+
         self.tabs = QTabWidget()
+
+        result_files = sorted(glob.glob(pathname='./log/*.result'), key=os.path.getmtime, reverse=True)
+        result_files = [os.path.abspath(f) for f in result_files]
+        for result_file in result_files:
+            f_name = os.path.splitext(os.path.basename(result_file))[0]
+            with open(file=result_file, mode='r', encoding='utf8') as file:
+                data = json.load(file)
+            tb = QTableWidget()
+            tb.verticalHeader().setVisible(False)
+            tb.setRowCount(7)
+
+            tb.horizontalHeader().setVisible(True)
+            tb.setColumnCount(2)
+            tb.setHorizontalHeaderLabels(["field", "value"])
+            tb.setColumnWidth(0, int(tb.size().width() * 0.3))
+            tb.setColumnWidth(1, int(tb.size().width() * 0.7))
+
+            # set contents
+            rc = 0
+            for k, v in data.items():
+                if k == 'object_cnt':
+                    for cls, cnt in v.items():
+                        tb.setItem(rc, 0, QTableWidgetItem(f"Count - {cls}(명)"))
+                        tb.setItem(rc, 1, QTableWidgetItem(str(cnt)))
+                        rc += 1
+                elif k == 'tts':
+                    for cls, total_t in v.items():
+                        cnt = int(data['object_cnt'][cls])
+                        avg_t = total_t / cnt
+                        tb.setItem(rc, 0, QTableWidgetItem(f"Stay Time - {cls}(sec)"))
+                        tb.setItem(rc, 1, QTableWidgetItem(f"{avg_t:.3f}"))
+                        rc += 1
+                elif k == 'checked_id':
+                    continue
+                else:
+                    tb.setItem(rc, 0, QTableWidgetItem(k))
+                    tb.setItem(rc, 1, QTableWidgetItem(v))
+                    rc += 1
+
+            self.tabs.addTab(tb, f_name)
+
+            self.resize(QSize(tb.size().width(), tb.size().height()))
+        layout = QVBoxLayout()
+        layout.addWidget(self.tabs)
+        self.setLayout(layout)
 
 
 class AnalysisResult(object):
     def __init__(self, source):
         self.data = {}
         self.source = source
-
 
     def init_analysis(self):
         get_logger().info("AnalysisResult initialization.")
@@ -355,7 +402,6 @@ class MainWidget(QWidget):
         self.layer_2.addWidget(self.bt_result)
         self.bt_start.setDisabled(True)
         self.bt_stop.setDisabled(True)
-        self.bt_result.setDisabled(True)
 
         # main layout
         self.main = QVBoxLayout()
@@ -400,7 +446,6 @@ class MainWidget(QWidget):
 
             self.bt_start.setDisabled(True)
             self.bt_stop.setDisabled(True)
-            self.bt_result.setDisabled(True)
         else:
             self.bt_set_area.setDisabled(False)
 
@@ -450,7 +495,6 @@ class MainWidget(QWidget):
         # if button state is disabled, enable button when you set area.
         self.bt_start.setDisabled(False)
         self.bt_stop.setDisabled(False)
-        self.bt_result.setDisabled(False)
 
         if self.analysis_thread is None:
             self.analysis_thread = AnalysisThread(
@@ -460,11 +504,13 @@ class MainWidget(QWidget):
                 tracker=self.obj_tracker,
                 polygons=self.analysis_area
             )
+        self.sbar.showMessage("분석 시작 버튼을 누르시면 영상 분석이 진행됩니다. 분석 영역을 추가하려면 분석 영역 설정 버튼을 눌러주세요")
 
     @Slot()
     def reset(self):
         self.analysis_area = []
         self.layer_1.img_label.polygon_points = []
+        self.el_source.setText("")
         self.set_dialog = None
 
         if self.analysis_thread is not None:
@@ -475,24 +521,32 @@ class MainWidget(QWidget):
 
         self.bt_start.setDisabled(True)
         self.bt_stop.setDisabled(True)
-        self.bt_result.setDisabled(True)
 
         self.layer_1.set_file('./data/images/default-video.png')
         self.logger.info("Disable button / img dialog and analysis thread be empty")
+        self.sbar.showMessage("분석을 초기화 하였습니다. 새롭게 영상을 분석 하려면 미디어 소스를 입력해 주세요")
 
     @Slot()
     def start_analysis(self):
-        self.logger.info("Start analysis")
+        self.logger.info("Click - bt_start button.")
+        self.sbar.showMessage("영상 분석 시작")
 
         self.analysis_thread.start()
 
+        self.bt_start.setDisabled(True)
+        self.bt_stop.setDisabled(False)
+
     @Slot()
     def stop_analysis(self):
-        self.logger.info("Stop analysis")
+        self.logger.info("Click - bt_stop button.")
+        self.sbar.showMessage("영상 분석 종료")
 
         self.analysis_thread.stop_run = True
         self.analysis_thread.exit()
         self.analysis_thread.stop_analysis()
+
+        self.bt_start.setDisabled(False)
+        self.bt_stop.setDisabled(True)
 
     @Slot()
     def draw_img(self, img, scale=False):
@@ -500,6 +554,8 @@ class MainWidget(QWidget):
 
     @Slot()
     def show_analysis(self):
+        self.logger.info("Click - bt_result button.")
+        self.sbar.showMessage("분석 결과 보기. 현재 영상 분석이 진행 중 이라면 분석을 종료해야 해당 분석 내용을 볼 수 있습니다.")
         result = ResultDialog(parent=self)
         result.show()
 

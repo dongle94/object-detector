@@ -1,5 +1,7 @@
+# -*- coding: utf-8 -*-
+
 # common
-shapely
+shapely==2.0.1
 numpy==1.23.5
 opencv-python==4.5.4.60
 pyside6==6.5.1.1

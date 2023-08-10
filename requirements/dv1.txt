@@ -1,8 +1,8 @@
+# -*- coding: utf-8 -*-
+
 # common
 numpy==1.23.5
 opencv-python==4.5.4.60
-Pillow
-pandas>=1.1.4
 pyside6==6.5.1.1
 yacs==0.1.8
 
@@ -10,6 +10,8 @@ yacs==0.1.8
 --extra-index-url https://download.pytorch.org/whl/cu117
 torch==2.0.1
 torchvision==0.15.2
+Pillow
+pandas>=1.1.4
 filterpy>=1.4.5
 PyYAML>=5.3.1
 

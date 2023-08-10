@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 keras==2.9.0
 tensorflow==2.9.3
 gdown

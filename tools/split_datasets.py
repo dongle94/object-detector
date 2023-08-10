@@ -18,7 +18,8 @@ def run(opt):
         # extract list for only images.
         # os.path.splitext(i)[1] == pathlib.Path(i).suffix
         imgs = [i for i in os.listdir(image_dir) if Path(i).suffix.lower() in ['.jpg', '.png', '.jpeg', '.bmp']]
-        imgs.sort()
+        if opt.shuffle is False:
+            imgs.sort()
 
         # check train/val ratio and number
         imgs_num = len(imgs)
@@ -65,6 +66,8 @@ def args_parse():
                         help="training set ratio. default is 0.9. "
                              "0.9 means that training sets' ratio is 0.9 and validation sets' 0.1")
     parser.add_argument('--move', action='store_true',
+                        help='if write this option, no image copy, move images.')
+    parser.add_argument('--shuffle', action='store_true',
                         help='if write this option, no image copy, move images.')
     _args = parser.parse_args()
     return _args

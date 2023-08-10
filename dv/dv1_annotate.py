@@ -12,6 +12,7 @@ import cv2
 from datetime import datetime
 from collections import defaultdict
 import shutil
+import numpy as np
 
 from pathlib import Path
 FILE = Path(__file__).resolve()
@@ -133,7 +134,11 @@ def main(opt=None):
         img_file = os.path.join(IMGS_DIR, i)
         get_logger().info(f"process {img_file}.")
         f = cv2.imread(img_file)
-
+        if os.path.exists(img_file) is True and f is None:      # File 경로에 한글
+            f = open(img_file.encode("utf8"), mode="rb")
+            bs = bytearray(f.read())
+            arr = np.asarray(bs, dtype=np.uint8)
+            f = cv2.imdecode(arr, cv2.IMREAD_UNCHANGED)
         # Connect click event
         winname = f"{idx+1}/{len(IMGS)}"
         cv2.namedWindow(winname)

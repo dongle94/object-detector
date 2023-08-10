@@ -1,15 +1,15 @@
 
-# DV1
+# DV4
 
 ## Install 
 ### requirement
 - Python 3.8 (test version)
 - Windows or Linux OS
-  - Test OS: Windows 10, Ubuntu 20.04
+  - Test OS: Windows 11, Ubuntu 20.04
 
 ```shell
 # install python package
-$ pip install -r ./requirements/dv1.txt
+$ pip install -r ./requirements/dv4.txt
 ```
 
 ## Weight Downloads
@@ -21,13 +21,13 @@ $ pip install -r ./requirements/dv1.txt
 
 
 ## run
-`dv1.yaml` include yolo configs and tracker configs. 
+`dv4.yaml` include yolo configs and tracker configs. 
 Modify the configuration file
 to fit your needs.
 
 ```shell
 # repository root directory
-$ python dv/dv1.py -c ./configs/dv1.yaml
+$ python dv/dv4.py -c ./configs/dv4.yaml
 ```
 
 ## deployment
@@ -38,17 +38,23 @@ $ pip install pyinstaller
 ```
 And below scripts create executable program with no detail install.
 ```shell
-$ pyinstaller -D ./dv/dv1.py --name DV1 -p ./ -p ./core/obj_detectors/ --collect-all torchvision
+$ pyinstaller -D ./dv1.py -p ./ -p ./core/obj_detectors/
 ```
 It makes `build`, `dist` directory in repository. we use `dist` directory. 
 That directory includes executable file you naming with `--name`.
 Before you run, you need to copy weight and config in this directory.
 you can execute this file in terminal or by double click.
 ```shell
-$ cd ./dist/dv1
+$ cd ./dist/dv4
 $ cp -r ../../weights ./
 $ cp -r ../../configs ./
+$ cp -r ../../data ./
 
-# default is ./DV1 -c ./configs/dv1.yaml
-$ ./DV1 
+
+# default is ./dv4 -c ./configs/dv1.yaml
+# Ubuntu OS
+$ ./dv4
+
+# Windows OS
+$ dv4.exe 
 ```

@@ -1,0 +1,34 @@
+# Environments
+DEVICE: 0
+
+# Media
+MEDIA_SOURCE: "0"
+MEDIA_OPT_AUTO: true
+MEDIA_WIDTH: 1280
+MEDIA_HEIGHT: 720
+MEDIA_FPS: 30
+
+# Object Detector
+DET_MODEL_TYPE: "yolo"
+DET_MODEL_PATH: './weights/yolov5s6.pt'
+IMG_SIZE: 1280
+HALF: false
+OBJ_CLASSES: [0,1]   # None or [0, 1, 2...]
+
+# Object Tracker
+TRACK_USE_ENCODER: true
+TRACK_MODEL_TYPE: "deepocsort"
+TRACK_MODEL_PATH: "./weights/osnet_x0_25_market1501.pt"
+TRACK_HALF: false
+
+# Logger
+LOG_LEVEL: 'info'
+CONSOLE_LOG: true
+CONSOLE_LOG_INTERVAL: 10
+LOGGER_NAME: "DV4"
+FILE_LOG: true
+LOG_FILE_DIR: './log/'
+LOG_FILE_COUNTER: 10
+LOG_FILE_ROTATE_TIME: "D"
+LOG_FILE_ROTATE_INTERVAL: 1
+

@@ -216,8 +216,10 @@ def args_parse():
                         help='image directory path')
     parser.add_argument('-j', '--json_file', required=True,
                         help="if write this file, append annotations")
-    parser.add_argument('-c', '--class_num', required=True, type=int,
+    parser.add_argument('-cn', '--class_num', required=True, type=int,
                         help="object class number 1~17")
+    parser.add_argument('-c', '--config', default='./configs/annotate.yaml',
+                        help="annotate.yaml config file path")
     _args = parser.parse_args()
     return _args
 
@@ -225,7 +227,7 @@ def args_parse():
 if __name__ == "__main__":
     args = args_parse()
 
-    update_config(cfg, args='./configs/annotate.yaml')
+    update_config(cfg, args=args.config)
     init_logger(cfg)
 
     main(args)

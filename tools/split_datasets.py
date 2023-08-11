@@ -68,7 +68,7 @@ def args_parse():
     parser.add_argument('--move', action='store_true',
                         help='if write this option, no image copy, move images.')
     parser.add_argument('--shuffle', action='store_true',
-                        help='if write this option, no image copy, move images.')
+                        help='if write this option, shuffle order image files.')
     _args = parser.parse_args()
     return _args
 

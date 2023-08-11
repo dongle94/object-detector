@@ -47,15 +47,16 @@ def process_mosaic(opt):
 
     update_config(cfg, args='./configs/mosaic.yaml')
     init_logger(cfg)
+    logger = get_logger()
 
     detector = ObjectDetector(cfg=cfg)
     face_detector = dlib.cnn_face_detection_model_v1('./weights/mmod_human_face_detector.dat')
 
     # 디렉토리 읽기
     is_file, is_dir = os.path.isfile(inps), os.path.isdir(inps)
-    print(f"{is_file=}, {is_dir=}")
+    logger.info(f"{is_file=}, {is_dir=}")
     if save_dir and not os.path.exists(save_dir):
-        print(f"make dir {save_dir}")
+        logger.info(f"make dir {save_dir}")
         os.makedirs(save_dir)
 
     # 이미지 리스트 가공
@@ -67,7 +68,7 @@ def process_mosaic(opt):
                 if os.path.isfile(os.path.abspath(os.path.join(inps, f)))]
         inps.sort()
     else:
-        print("There is no image files")
+        logger.info("There is no image files")
         return
 
     # 이미지 loop start
@@ -117,22 +118,23 @@ def process_mosaic(opt):
                 for fd in face_det:
                     d = fd.rect
                     fx1, fy1, fx2, fy2 = d.left(), d.top(), d.right(), d.bottom()
-                    mosaic(img, (x1+fx1, y1+fy1, x1+fx2, y1+fy2), block=8)
+                    mosaic(img, (x1+fx1, y1+fy1, x1+fx2, y1+fy2), block=5)
             elif d[5] == 1:
                 # 머리 박스 모자이크 처리
                 x1, y1, x2, y2 = map(int, d[:4])
-                mosaic(img, (x1, y1, x2, y2), block=4)
+                mosaic(img, (x1, y1, x2, y2), block=5)
 
         # 전체 이미지에 대해서 인식되는 얼굴 모자이크 처리
         for wd in whole_det:
             wd = wd.rect
             wx1, wy1, wx2, wy2 = wd.left(), wd.top(), wd.right(), wd.bottom()
-            cv2.rectangle(orig_img, (wx1, wy1), (wx2, wy2), (96, 96, 216), thickness=2,
-                          lineType=cv2.LINE_AA)
-            mosaic(img, (wx1, wy1, wx2, wy2), block=8)
+            if is_show:
+                cv2.rectangle(orig_img, (wx1, wy1), (wx2, wy2), (96, 96, 216), thickness=2,
+                              lineType=cv2.LINE_AA)
+            mosaic(img, (wx1, wy1, wx2, wy2), block=5)
 
         # 시간 부분 마스킹
-        mosaic(img, (1450, 50, 1850, 100), block=10)
+        # mosaic(img, (1450, 50, 1850, 100), block=10)
         #cv2.rectangle(img, (1450, 50), (1850, 90), (216, 216, 216), -1)
 
 
@@ -151,7 +153,7 @@ def process_mosaic(opt):
             cv2.imwrite(os.path.join(save_dir, os.path.basename(inp)), img)
     et = time.time()
     if f_cnt:
-        print(f"{f_cnt} images spend {et - st:.4f} sec.")
+        logger.info(f"{f_cnt} images spend {et - st:.4f} sec.")
 
 
 def args_parse():

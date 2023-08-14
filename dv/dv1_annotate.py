@@ -203,7 +203,7 @@ def main(opt=None):
             anno_ids += 1
             obj_classes[opt.class_num] += 1
 
-            new_path = os.path.join(IMGS_DIR, 'already', i)
+            new_path = os.path.join(IMGS_DIR, opt.type, i)
             if not os.path.exists(os.path.dirname(new_path)):
                 os.makedirs(os.path.dirname(new_path))
             shutil.move(img_file, new_path)
@@ -221,6 +221,8 @@ def args_parse():
                         help='image directory path')
     parser.add_argument('-j', '--json_file', required=True,
                         help="if write this file, append annotations")
+    parser.add_argument('-t', '--type', default='train',
+                        help='type is in [train, val]. this option write file_path {type}/img_file')
     parser.add_argument('-cn', '--class_num', required=True, type=int,
                         help="object class number 1~17")
     parser.add_argument('-c', '--config', default='./configs/annotate.yaml',

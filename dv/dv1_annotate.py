@@ -174,7 +174,7 @@ def main(opt=None):
             if len(box_point) == 2:
                 pt1, pt2 = box_point[0], box_point[1]
                 rel_pt1 = (pt1[0]/edit_img_size[1], pt1[1]/edit_img_size[0])
-                rel_pt2 = (pt2[0]/edit_img_size[1], pt2[1]/edit_img_size[1])
+                rel_pt2 = (pt2[0]/edit_img_size[1], pt2[1]/edit_img_size[0])
                 orig_pt1 = (int(rel_pt1[0] * orig_img_size[1]), int(rel_pt1[1] * orig_img_size[0]))
                 orig_pt2 = (int(rel_pt2[0] * orig_img_size[1]), int(rel_pt2[1] * orig_img_size[0]))
                 w = int(orig_pt2[0] - orig_pt1[0])

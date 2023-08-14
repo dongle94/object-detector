@@ -23,7 +23,6 @@ os.chdir(ROOT)
 from utils.config import _C as cfg
 from utils.config import update_config
 from utils.logger import get_logger, init_logger
-from core.obj_detectors import ObjectDetector
 
 
 img = None
@@ -154,7 +153,7 @@ def main(opt=None):
             for l_info in label_info:
                 pt1, pt2 = l_info[0], l_info[1]
                 rel_pt1 = (pt1[0] / edit_img_size[1], pt1[1] / edit_img_size[0])
-                rel_pt2 = (pt2[0] / edit_img_size[1], pt2[1] / edit_img_size[1])
+                rel_pt2 = (pt2[0] / edit_img_size[1], pt2[1] / edit_img_size[0])
                 orig_pt1 = (int(rel_pt1[0] * orig_img_size[1]), int(rel_pt1[1] * orig_img_size[0]))
                 orig_pt2 = (int(rel_pt2[0] * orig_img_size[1]), int(rel_pt2[1] * orig_img_size[0]))
                 w = int(orig_pt2[0] - orig_pt1[0])
@@ -176,14 +175,19 @@ def main(opt=None):
             basic_fmt["images"].append(img_info)
             img_ids += 1
             get_logger().info(
-                f"Save label {img_file}. add {len(label_info)} boxes.)"
+                f"Save label {img_file}. Add {len(label_info)} boxes."
             )
 
             label_info = []
         cv2.destroyWindow(winname)
 
-    # with open(os.path.join(opt.json_file), 'w') as outfile:
-    #     json.dump(basic_fmt, outfile, indent=2)
+        new_path = os.path.join(IMGS_DIR, opt.type, i)
+        if not os.path.exists(os.path.dirname(new_path)):
+            os.makedirs(os.path.dirname(new_path))
+        shutil.move(img_file, new_path)
+
+    with open(os.path.join(opt.json_file), 'w') as outfile:
+        json.dump(basic_fmt, outfile, indent=2)
     get_logger().info(f"obj classes: {obj_classes}")
 
 

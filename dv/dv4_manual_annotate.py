@@ -38,9 +38,7 @@ def draw_event(event, x, y, flags, param):
         cv2.circle(img, (x, y), 3, (32, 216, 32), -1)
         box_point.append((x, y))
         if len(box_point) == 2:
-            cv2.rectangle(img, box_point[0], box_point[1], (32, 216, 32), 1, cv2.LINE_AA)
             crop_img = img[box_point[0][1]:box_point[1][1], box_point[0][0]:box_point[1][0]]
-
             cv2.imshow("crop", crop_img)
             key = cv2.waitKey(0)
             _class = 0
@@ -48,9 +46,14 @@ def draw_event(event, x, y, flags, param):
                 _class = 1
             elif key == ord("2"):
                 _class = 2
+            elif key == ord("d"):
+                box_point = []
+                cv2.destroyWindow("crop")
+                return
             else:
                 raise Exception("Wrong Key input")
             label_info.append((box_point[0], box_point[1], _class))
+            cv2.rectangle(img, box_point[0], box_point[1], (32, 216, 32), 1, cv2.LINE_AA)
             box_point = []
             cv2.destroyWindow("crop")
             print(label_info)

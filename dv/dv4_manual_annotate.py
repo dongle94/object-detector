@@ -31,6 +31,14 @@ box_point = []
 label_info = []
 
 
+def get_box_point(pt1, pt2):
+    x1, y1 = pt1
+    x2, y2 = pt2
+    new_pt1 = (min(x1, x2), min(y1, y2))
+    new_pt2 = (max(x1, x2), max(y1, y2))
+    return new_pt1, new_pt2
+
+
 def draw_event(event, x, y, flags, param):
     global mouseX, mouseY, img, box_point, label_info
     if event == cv2.EVENT_LBUTTONDOWN:
@@ -38,7 +46,8 @@ def draw_event(event, x, y, flags, param):
         cv2.circle(img, (x, y), 3, (32, 216, 32), -1)
         box_point.append((x, y))
         if len(box_point) == 2:
-            crop_img = img[box_point[0][1]:box_point[1][1], box_point[0][0]:box_point[1][0]]
+            box_pt1, box_pt2 = get_box_point(box_point[0], box_point[1])
+            crop_img = img[box_pt1[1]:box_pt2[1], box_pt1[0]:box_pt2[0]]
             cv2.imshow("crop", crop_img)
             key = cv2.waitKey(0)
             _class = 0
@@ -52,8 +61,8 @@ def draw_event(event, x, y, flags, param):
                 return
             else:
                 raise Exception("Wrong Key input")
-            label_info.append((box_point[0], box_point[1], _class))
-            cv2.rectangle(img, box_point[0], box_point[1], (32, 216, 32), 1, cv2.LINE_AA)
+            label_info.append((box_pt1, box_pt2, _class))
+            cv2.rectangle(img, box_pt1, box_pt2, (32, 216, 32), 1, cv2.LINE_AA)
             box_point = []
             cv2.destroyWindow("crop")
             print(label_info)

@@ -13,6 +13,7 @@ from datetime import datetime
 from collections import defaultdict
 import shutil
 import numpy as np
+import platform
 
 from pathlib import Path
 FILE = Path(__file__).resolve()
@@ -68,6 +69,7 @@ def draw_event(event, x, y, flags, param):
         cv2.line(im, (x, 0), (x, img_size[0]), (0, 0, 0), 2, cv2.LINE_AA)
         cv2.line(im, (0, y), (img_size[1], y), (0, 0, 0), 2, cv2.LINE_AA)
         cv2.imshow(param, im)
+
 
 def main(opt=None):
     get_logger().info(f"Start dv1 annotation script. Object class is {opt.class_num}")
@@ -211,7 +213,10 @@ def main(opt=None):
         cv2.destroyAllWindows()
 
     with open(os.path.join(opt.json_file), 'w') as outfile:
-        json.dump(basic_fmt, outfile, indent=1)
+        if platform.system() == 'Windows':
+            json.dump(basic_fmt, outfile, indent=1, ensure_ascii=False)
+        elif platform.system() == 'Linux':
+            json.dump(basic_fmt, outfile, indent=1)
     get_logger().info(f"Stop Annotation. Obj classes: {obj_classes}")
 
 

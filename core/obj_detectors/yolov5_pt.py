@@ -63,7 +63,7 @@ class YoloDetector(nn.Module):
             return self.from_numpy(y)
 
     def postprocess(self, pred, im_shape, im0_shape, max_det=100):
-        pred = non_max_suppression(pred, classes=self.classes, max_det=max_det)[0]
+        pred = non_max_suppression(pred, classes=self.classes, agnostic=True, max_det=max_det)[0]
         det = scale_boxes(im_shape[2:], copy.deepcopy(pred[:, :4]), im0_shape).round()
         det = torch.cat([det, pred[:, 4:]], dim=1)
 

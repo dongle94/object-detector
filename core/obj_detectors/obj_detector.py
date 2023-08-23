@@ -14,6 +14,7 @@ from utils.logger import get_logger
 
 class ObjectDetector(object):
     def __init__(self, cfg=None):
+        self.cfg = cfg
         # Detection model configuration
         if os.path.abspath(cfg.DET_MODEL_PATH) != cfg.DET_MODEL_PATH:
             weight = os.path.abspath(os.path.join(ROOT, cfg.DET_MODEL_PATH))
@@ -25,6 +26,7 @@ class ObjectDetector(object):
             device = cfg.DEVICE
             fp16 = cfg.HALF
             img_size = cfg.IMG_SIZE
+            self.max_det = cfg.MAX_DET
             self.im_shape = None
             self.im0_shape = None
 
@@ -62,9 +64,12 @@ class ObjectDetector(object):
     def postprocess(self, ret):
         preds, dets = None, None
         if self.detector_type == 'yolo':
-            max_det = 100
-            preds, dets = self.detector.postprocess(pred=ret, im_shape=self.im_shape,
-                                                    im0_shape=self.im0_shape, max_det=max_det)
+            preds, dets = self.detector.postprocess(
+                pred=ret, im_shape=self.im_shape, im0_shape=self.im0_shape,
+                conf_thres=self.cfg.CONF_THRES,
+                nms_iou=self.cfg.NMS_IOU,
+                agnostic_nms=self.cfg.AGNOSTIC_NMS,
+                max_det=self.max_det)
 
         return preds, dets
 

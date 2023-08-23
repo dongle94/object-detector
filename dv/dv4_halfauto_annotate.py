@@ -188,7 +188,7 @@ def main(opt=None):
             # image resize
             orig_img_size = (f0.shape[0], f0.shape[1])
             edit_img_size = orig_img_size
-            global img
+            global img, label_info
             img = f1
             while f1.shape[0] > 1000:
                 f1 = cv2.resize(f1, (int(im_w * 0.8), int(im_h * 0.8)))
@@ -245,7 +245,6 @@ def main(opt=None):
                 is_out = True
                 break
             elif k == ord(" "):
-                global label_info
                 for l_info in label_info:
                     pt1, pt2 = l_info[0], l_info[1]
                     rel_pt1 = (pt1[0] / edit_img_size[1], pt1[1] / edit_img_size[0])
@@ -285,7 +284,6 @@ def main(opt=None):
                 shutil.move(img_file, new_path)
                 img_ids += 1
             else:
-                global label_info
                 label_info = []
                 continue
 

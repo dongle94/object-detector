@@ -165,7 +165,7 @@ def main(opt=None):
             img_info = {
                 "id": img_ids,
                 "license": 1,
-                "file_name": i,
+                "file_name": os.path.join(opt.type, i),
                 "height": f0.shape[0],
                 "width": f0.shape[1],
                 "data_captured": datetime.now().strftime("%Y-%m-%dT%H:%M:%S")

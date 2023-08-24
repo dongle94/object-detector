@@ -62,6 +62,7 @@ class YoloDetector(nn.Module):
         else:
             return self.from_numpy(y)
 
+
     def postprocess(self, pred, im_shape, im0_shape, conf_thres=0.25, nms_iou=0.45, agnostic_nms=False, max_det=100):
         pred = non_max_suppression(pred, classes=self.classes, conf_thres=conf_thres, iou_thres=nms_iou,
                                    agnostic=agnostic_nms, max_det=max_det)[0]

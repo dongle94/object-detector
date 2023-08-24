@@ -13,6 +13,7 @@ from datetime import datetime
 from collections import defaultdict
 import shutil
 import numpy as np
+import platform
 
 from pathlib import Path
 FILE = Path(__file__).resolve()
@@ -68,6 +69,7 @@ def draw_event(event, x, y, flags, param):
         cv2.line(im, (x, 0), (x, img_size[0]), (0, 0, 0), 2, cv2.LINE_AA)
         cv2.line(im, (0, y), (img_size[1], y), (0, 0, 0), 2, cv2.LINE_AA)
         cv2.imshow(param, im)
+
 
 def main(opt=None):
     get_logger().info(f"Start dv1 annotation script. Object class is {opt.class_num}")
@@ -174,7 +176,7 @@ def main(opt=None):
             if len(box_point) == 2:
                 pt1, pt2 = box_point[0], box_point[1]
                 rel_pt1 = (pt1[0]/edit_img_size[1], pt1[1]/edit_img_size[0])
-                rel_pt2 = (pt2[0]/edit_img_size[1], pt2[1]/edit_img_size[1])
+                rel_pt2 = (pt2[0]/edit_img_size[1], pt2[1]/edit_img_size[0])
                 orig_pt1 = (int(rel_pt1[0] * orig_img_size[1]), int(rel_pt1[1] * orig_img_size[0]))
                 orig_pt2 = (int(rel_pt2[0] * orig_img_size[1]), int(rel_pt2[1] * orig_img_size[0]))
                 w = int(orig_pt2[0] - orig_pt1[0])
@@ -203,7 +205,7 @@ def main(opt=None):
             anno_ids += 1
             obj_classes[opt.class_num] += 1
 
-            new_path = os.path.join(IMGS_DIR, 'already', i)
+            new_path = os.path.join(IMGS_DIR, opt.type, i)
             if not os.path.exists(os.path.dirname(new_path)):
                 os.makedirs(os.path.dirname(new_path))
             shutil.move(img_file, new_path)
@@ -211,7 +213,10 @@ def main(opt=None):
         cv2.destroyAllWindows()
 
     with open(os.path.join(opt.json_file), 'w') as outfile:
-        json.dump(basic_fmt, outfile, indent=1)
+        if platform.system() == 'Windows':
+            json.dump(basic_fmt, outfile, indent=1, ensure_ascii=False)
+        elif platform.system() == 'Linux':
+            json.dump(basic_fmt, outfile, indent=1)
     get_logger().info(f"Stop Annotation. Obj classes: {obj_classes}")
 
 
@@ -221,6 +226,8 @@ def args_parse():
                         help='image directory path')
     parser.add_argument('-j', '--json_file', required=True,
                         help="if write this file, append annotations")
+    parser.add_argument('-t', '--type', default='train',
+                        help='type is in [train, val]. this option write file_path {type}/img_file')
     parser.add_argument('-cn', '--class_num', required=True, type=int,
                         help="object class number 1~17")
     parser.add_argument('-c', '--config', default='./configs/annotate.yaml',

@@ -181,8 +181,13 @@ def main(opt=None):
             for d in _det:
                 x1, y1, x2, y2 = map(int, d[:4])
                 w, h = x2 - x1, y2 - y1
-
-                b_color = (16, 216, 16)
+                _cls_idx = int(d[5])
+                if _cls_idx == 0:       # female
+                    b_color = (128, 128, 255)
+                elif _cls_idx == 1:     # male
+                    b_color = (255, 128, 128)
+                else:
+                    raise Exception("Wrong Class index")
                 cv2.rectangle(f1, (x1, y1), (x2, y2), b_color, thickness=1, lineType=cv2.LINE_AA)
 
             # image resize

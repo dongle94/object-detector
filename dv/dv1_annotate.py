@@ -4,13 +4,14 @@ datavoucher 1 - 다올씨앤디
 Product object 17 classes
 Manual labeling script
 """
+
 import json
 import os
 import sys
 import argparse
-import cv2
 from datetime import datetime
 from collections import defaultdict
+import cv2
 import shutil
 import numpy as np
 import platform
@@ -41,17 +42,32 @@ PROD_CLASS = {
     "닭갈비고추장500g": 10,
     "갈릭디핑소스500g": 11,
     "치즈치폴레소스500g": 12,
-    "13cls": 13,
-    "14cls": 14,
-    "15cls": 15,
-    "16cls": 16,
-    "17cls": 17,
+    "훈제오리400g": 13,
+    "오리안심500g": 14,
+    "치킨파우더500g": 15,
+    "볼케이노소스500g": 16,
+    "뿌링클링시즈닝150g": 17,
 }
 
 
 img = None
 mouseX, mouseY = 0, 0
 box_point = []
+
+
+def get_box_point(pt1, pt2):
+    """
+    return box point xyxy with 2 points
+    :param pt1:
+    :param pt2:
+    :return new_pt1, new_pt2:
+    """
+    x1, y1 = pt1
+    x2, y2 = pt2
+    new_pt1 = (min(x1, x2), min(y1, y2))
+    new_pt2 = (max(x1, x2), max(y1, y2))
+    return new_pt1, new_pt2
+
 
 
 def draw_event(event, x, y, flags, param):
@@ -61,7 +77,8 @@ def draw_event(event, x, y, flags, param):
         cv2.circle(img, (x, y), 5, (32, 216, 32), -1)
         box_point.append((x, y))
         if len(box_point) == 2:
-            cv2.rectangle(img, box_point[0], box_point[1], (32, 32, 216), 2, cv2.LINE_AA)
+            box_pt1, box_pt2 = get_box_point(box_point[0], box_point[1])
+            cv2.rectangle(img, box_pt1, box_pt2, (32, 32, 216), 2, cv2.LINE_AA)
         cv2.imshow(param, img)
     if event == cv2.EVENT_MOUSEMOVE:
         im = img.copy()
@@ -96,7 +113,7 @@ def main(opt=None):
         get_logger().info(f"{opt.json_file} is not exist. Create new annotation file")
         basic_fmt = {
             "info": {"year": "2023", "version": "1",
-                     "description": "datavoucher dataset",
+                     "description": "datavoucher product detection dataset",
                      "contributor": "",
                      "url": "",
                      "date_created": datetime.now().strftime("%Y-%m-%dT%H:%M:%S")},
@@ -115,11 +132,11 @@ def main(opt=None):
                 {"id": 10, "name": "닭갈비고추장500g", "supercategory": "product"},
                 {"id": 11, "name": "갈릭디핑소스500g", "supercategory": "product"},
                 {"id": 12, "name": "치즈치폴레소스500g", "supercategory": "product"},
-                {"id": 13, "name": "14cls", "supercategory": "product"},
-                {"id": 14, "name": "15cls", "supercategory": "product"},
-                {"id": 15, "name": "16cls", "supercategory": "product"},
-                {"id": 16, "name": "17cls", "supercategory": "product"},
-                {"id": 17, "name": "18cls", "supercategory": "product"},
+                {"id": 13, "name": "훈제오리400g", "supercategory": "product"},
+                {"id": 14, "name": "오리안심500g", "supercategory": "product"},
+                {"id": 15, "name": "치킨파우더500g", "supercategory": "product"},
+                {"id": 16, "name": "볼케이노소스500g", "supercategory": "product"},
+                {"id": 17, "name": "뿌링클링시즈닝150g", "supercategory": "product"},
             ],
             "images": [],
             "annotations": []
@@ -128,19 +145,20 @@ def main(opt=None):
         anno_ids = 0
 
     image_extension = ['.jpg', '.png', '.jpeg', '.bmp']
+
     IMGS = [i for i in os.listdir(IMGS_DIR) if os.path.splitext(i)[-1].lower() in image_extension]
     IMGS.sort()
 
     for idx, i in enumerate(IMGS):
-
         img_file = os.path.join(IMGS_DIR, i)
         get_logger().info(f"process {img_file}.")
-        f = cv2.imread(img_file)
-        if os.path.exists(img_file) is True and f is None:      # File 경로에 한글
-            f = open(img_file.encode("utf8"), mode="rb")
-            bs = bytearray(f.read())
+        f0 = cv2.imread(img_file)
+        if os.path.exists(img_file) is True and f0 is None:      # File 경로에 한글
+            f0 = open(img_file.encode("utf8"), mode="rb")
+            bs = bytearray(f0.read())
             arr = np.asarray(bs, dtype=np.uint8)
-            f = cv2.imdecode(arr, cv2.IMREAD_UNCHANGED)
+            f0 = cv2.imdecode(arr, cv2.IMREAD_UNCHANGED)
+
         # Connect click event
         winname = f"{idx+1}/{len(IMGS)}"
         cv2.namedWindow(winname)
@@ -149,24 +167,26 @@ def main(opt=None):
         img_info = {
             "id": img_ids,
             "license": 1,
-            "file_name": i,
-            "height": f.shape[0],
-            "width": f.shape[1],
+            "file_name": os.path.join(opt.type, i),
+            "height": f0.shape[0],
+            "width": f0.shape[1],
             "data_captured": datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
         }
 
         # image resize
-        orig_img_size = (f.shape[0], f.shape[1])
+        f1 = f0.copy()
+        orig_img_size = (f0.shape[0], f0.shape[1])
         edit_img_size = orig_img_size
         global img
-        img = f
-        while f.shape[0] >= 1080:
-            f = cv2.resize(f, (int(f.shape[1] / 2), int(f.shape[0] / 2)))
-            img = f
-            edit_img_size = (f.shape[0], f.shape[1])
+        img = f1
+        while f1.shape[0] >= 1080:
+            f1 = cv2.resize(f1, (int(f1.shape[0] * 0.8), int(f1.shape[1] * 0.8)))
+            img = f1
+            edit_img_size = (f1.shape[0], f1.shape[1])
 
         # winname에 한글 입력 불가
-        cv2.imshow(winname, f)
+        cv2.imshow(winname, f1)
+
         k = cv2.waitKey(0)
         if k == ord('q'):
             get_logger().info("-- CV2 Stop --")
@@ -174,7 +194,7 @@ def main(opt=None):
         elif k == ord(" "):
             global box_point
             if len(box_point) == 2:
-                pt1, pt2 = box_point[0], box_point[1]
+                pt1, pt2 = get_box_point(box_point[0], box_point[1])
                 rel_pt1 = (pt1[0]/edit_img_size[1], pt1[1]/edit_img_size[0])
                 rel_pt2 = (pt2[0]/edit_img_size[1], pt2[1]/edit_img_size[0])
                 orig_pt1 = (int(rel_pt1[0] * orig_img_size[1]), int(rel_pt1[1] * orig_img_size[0]))
@@ -189,13 +209,13 @@ def main(opt=None):
                 "image_id": img_ids,
                 "category_id": opt.class_num,
                 "bbox": [orig_pt1[0], orig_pt1[1], w, h],
-                "area": w*h,
+                "area": w * h,
                 "segmentation": [],
                 "iscrowd": 0
             }
             get_logger().info(
                 f"Save label {img_file}. Box point is {orig_pt1, w, h}. resize box point is {pt1, pt2}."
-                f"relative point is ({rel_pt1[0]:.4f}, {rel_pt1[1]:.4f}) ({rel_pt2[0]:.4f}, {rel_pt2[1]:.4f})"
+                f"relative point is ({rel_pt1[0]:.3f}, {rel_pt1[1]:.3f}) ({rel_pt2[0]:.3f}, {rel_pt2[1]:.3f})"
             )
 
             # add annotation
@@ -209,14 +229,13 @@ def main(opt=None):
             if not os.path.exists(os.path.dirname(new_path)):
                 os.makedirs(os.path.dirname(new_path))
             shutil.move(img_file, new_path)
+        else:
+            continue
 
         cv2.destroyAllWindows()
 
     with open(os.path.join(opt.json_file), 'w') as outfile:
-        if platform.system() == 'Windows':
-            json.dump(basic_fmt, outfile, indent=1, ensure_ascii=False)
-        elif platform.system() == 'Linux':
-            json.dump(basic_fmt, outfile, indent=1)
+        json.dump(basic_fmt, outfile, indent=1, ensure_ascii=False)
     get_logger().info(f"Stop Annotation. Obj classes: {obj_classes}")
 
 

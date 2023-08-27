@@ -148,11 +148,11 @@ def main(opt=None):
             get_logger().info(f"process {img_file}.")
             f0 = cv2.imread(img_file)
             if os.path.exists(img_file) is True and f0 is None:  # File 경로에 한글
-                f = open(img_file.encode("utf8"), mode="rb")
-                bs = bytearray(f.read())
+                f0 = open(img_file.encode("utf8"), mode="rb")
+                bs = bytearray(f0.read())
                 arr = np.asarray(bs, dtype=np.uint8)
-                f = cv2.imdecode(arr, cv2.IMREAD_UNCHANGED)
-
+                f0 = cv2.imdecode(arr, cv2.IMREAD_UNCHANGED)
+            # Connect click event
             winname = f"{idx + 1}/{len(IMGS)}"
             cv2.namedWindow(winname)
             cv2.setMouseCallback(winname, draw_event, winname)

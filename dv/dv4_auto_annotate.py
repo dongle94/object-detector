@@ -4,7 +4,6 @@ datavoucher 4 - withyou
 human object classes by gender: male, female
 custom trained model detection result
 """
-
 import json
 import os
 import sys
@@ -14,7 +13,7 @@ from collections import defaultdict
 import cv2
 import shutil
 import numpy as np
-
+from tqdm import tqdm
 from pathlib import Path
 
 FILE = Path(__file__).resolve()
@@ -80,8 +79,8 @@ def main(opt=None):
         IMGS = [i for i in os.listdir(IMGS_DIR) if os.path.splitext(i)[-1].lower() in image_extension]
         IMGS.sort()
         get_logger().info(f"process {IMGS_DIR} ..")
-        _imgs = tqdm(IMGS, f'{IMGS_DIR} images ..')
-        for i in _imgs:
+        _imgs = tqdm(enumerate(IMGS), f'{IMGS_DIR} images ..')
+        for idx, i in _imgs:
             if is_out is True:
                 break
 
@@ -92,6 +91,8 @@ def main(opt=None):
                 bs = bytearray(f0.read())
                 arr = np.asarray(bs, dtype=np.uint8)
                 f0 = cv2.imdecode(arr, cv2.IMREAD_UNCHANGED)
+
+            winname = f"{idx + 1}/{len(IMGS)}"
 
             # yolov5 human detector
             im = detector.preprocess(f0)
@@ -112,11 +113,9 @@ def main(opt=None):
             tmp_annos = []
 
             f1 = f0.copy()
-            im_h, im_w = f0.shape[0], f0.shape[1]
             for d in _det:
                 x1, y1, x2, y2 = map(int, d[:4])
                 w, h = x2 - x1, y2 - y1
-
                 _cls_idx = int(d[5])
                 if detector.names[_cls_idx] == 'female':
                     category_id = 2
@@ -126,8 +125,6 @@ def main(opt=None):
                     b_color = (216, 16, 16)
                 else:
                     raise Exception("Wrong Class index")
-                if show_img is True:
-                    cv2.rectangle(f1, (x1, y1), (x2, y2), b_color, thickness=1, lineType=cv2.LINE_AA)
 
                 anno_info = {"id": anno_ids,
                              "image_id": img_ids,
@@ -140,13 +137,13 @@ def main(opt=None):
                 anno_ids += 1
                 c_id[category_id] += 1
 
+                if show_img is True:
+                    cv2.rectangle(f1, (x1, y1), (x2, y2), b_color, thickness=1, lineType=cv2.LINE_AA)
+
             if show_img is True:
-                # image resize
-                orig_img_size = (f0.shape[0], f0.shape[1])
-                edit_img_size = orig_img_size
+                # Image resize
                 while f1.shape[0] >= 1080:
                     f1 = cv2.resize(f1, (int(f1.shape[1] * 0.8), int(f1.shape[0] * 0.8)))
-                    edit_img_size = (f1.shape[0], f1.shape[1])
                 cv2.imshow(winname, f1)
 
                 k = cv2.waitKey(0)
@@ -155,14 +152,14 @@ def main(opt=None):
                     get_logger().info("-- CV2 Stop --")
                     is_out = True
                     break
-                elif k == ord('y'):
-                    show_img = False
+                elif k == ord(" "):
                     basic_fmt["images"].append(img_info)
                     for k, v in c_id.items():
                         obj_classes[k] += v
                     for _anno_info in tmp_annos:
                         basic_fmt["annotations"].append(_anno_info)
-                elif k == ord(" "):
+                elif k == ord('y'):
+                    show_img = False
                     basic_fmt["images"].append(img_info)
                     for k, v in c_id.items():
                         obj_classes[k] += v
@@ -190,6 +187,8 @@ def args_parse():
                         help="if write this file, append annotations")
     parser.add_argument('-t', '--type', default='train',
                         help='type is in [train, val]. this option write file_path {type}/img_file')
+    parser.add_argument('-c', '--config', default='./configs/annotate.yaml',
+                        help="annotation configuration yaml file path")
     _args = parser.parse_args()
     return _args
 
@@ -197,7 +196,7 @@ def args_parse():
 if __name__ == "__main__":
     args = args_parse()
 
-    update_config(cfg, args='./configs/annotate.yaml')
+    update_config(cfg, args=args.config)
     init_logger(cfg)
 
     main(args)

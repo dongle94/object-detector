@@ -13,7 +13,6 @@ from collections import defaultdict
 import cv2
 import shutil
 import numpy as np
-import platform
 
 from pathlib import Path
 FILE = Path(__file__).resolve()
@@ -27,12 +26,14 @@ from utils.config import update_config
 from utils.logger import get_logger, init_logger
 from core.obj_detectors import ObjectDetector
 
+
 def main(opt=None):
     get_logger().info(f"Start dv4 annotation script.")
     IMGS_DIRS = opt.imgs_dir
     get_logger().info(f"Input Directory is {IMGS_DIRS}")
 
     detector = ObjectDetector(cfg=cfg)
+
     obj_classes = defaultdict(int)
 
     if os.path.exists(opt.json_file):
@@ -68,7 +69,6 @@ def main(opt=None):
         anno_ids = 0
 
     is_out = False
-
     image_extension = ['.jpg', '.png', '.jpeg', '.bmp']
     for IMGS_DIR in IMGS_DIRS:
         if is_out is True:
@@ -114,15 +114,15 @@ def main(opt=None):
             for d in _det:
                 x1, y1, x2, y2 = map(int, d[:4])
                 w, h = x2 - x1, y2 - y1
-
-                if int(d[5]) == 0:      # female
+                _cls_idx = int(d[5])
+                if detector.names[_cls_idx] == 'female':
                     b_color = (16, 16, 216)
                     category_id = 2
-                elif int(d[5]) == 1:    # male
+                elif detector.names[_cls_idx] == 'male':
                     b_color = (216, 16, 16)
                     category_id = 1
                 else:                   # bug
-                    raise "wrong index class id"
+                    raise Exception("Wrong Class index")
 
                 anno_info = {"id": anno_ids,
                              "image_id": img_ids,
@@ -137,8 +137,9 @@ def main(opt=None):
 
                 cv2.rectangle(f1, (x1, y1), (x2, y2), b_color, thickness=1, lineType=cv2.LINE_AA)
 
+            # Image resize
             while f1.shape[0] >= 1080:
-                f1 = cv2.resize(f1, (int(f1.shape[1] * 0.9), int(f1.shape[0] * 0.9)))
+                f1 = cv2.resize(f1, (int(f1.shape[1] * 0.8), int(f1.shape[0] * 0.8)))
             cv2.imshow(winname, f1)
 
             k = cv2.waitKey(0)
@@ -148,18 +149,21 @@ def main(opt=None):
                 is_out = True
                 break
             elif k == ord(" "):
-                basic_fmt["images"].append(img_info)
-                img_ids += 1
-                for k, v in c_id.items():
-                    obj_classes[k] += v
-                for _anno_info in tmp_annos:
-                    basic_fmt["annotations"].append(_anno_info)
-                get_logger().info(f"Save label {img_file}. Add {len(_det)} boxes.")
+                if is_out is False:
+                    basic_fmt["images"].append(img_info)
+                    for k, v in c_id.items():
+                        obj_classes[k] += v
+                    for _anno_info in tmp_annos:
+                        basic_fmt["annotations"].append(_anno_info)
+                    get_logger().info(
+                        f"Save label {img_file}. Add {len(tmp_annos)} boxes."
+                    )
 
                 new_path = os.path.join(IMGS_DIR, opt.type, i)
                 if not os.path.exists(os.path.dirname(new_path)):
                     os.makedirs(os.path.dirname(new_path))
                 shutil.move(img_file, new_path)
+                img_ids += 1
             elif k == ord("n"):
                 get_logger().info(f"Pending this image. move {img_file} to pending directory.")
                 new_path = os.path.join(IMGS_DIR, "pending", i)
@@ -171,8 +175,7 @@ def main(opt=None):
                 continue
 
     with open(os.path.join(opt.json_file), 'w') as outfile:
-        ensure_ascii = False if platform.system() == 'Windows' else True
-        json.dump(basic_fmt, outfile, indent=2, ensure_ascii=ensure_ascii)
+        json.dump(basic_fmt, outfile, indent=2, ensure_ascii=False)
 
     get_logger().info(f"obj classes: {obj_classes}")
 

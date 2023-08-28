@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 datavoucher 4 - withyou
 human object classes by gender: male, female
@@ -43,7 +44,7 @@ def draw_event(event, x, y, flags, param):
     global mouseX, mouseY, img, box_point, label_info
     if event == cv2.EVENT_LBUTTONDOWN:
         mouseX, mouseY = x, y
-        cv2.circle(img, (x, y), 3, (32, 216, 32), -1)
+        cv2.circle(img, (x, y), 2, (32, 216, 32), -1)
         box_point.append((x, y))
         if len(box_point) == 2:
             box_pt1, box_pt2 = get_box_point(box_point[0], box_point[1])
@@ -53,16 +54,16 @@ def draw_event(event, x, y, flags, param):
             _class = 0
             if key == ord("1"):
                 _class = 1
+                b_color = (216, 16, 16)  # male blue
             elif key == ord("2"):
                 _class = 2
-            elif key == ord("d"):
+                b_color = (16, 16, 216)  # female red
+            else:
                 box_point = []
                 cv2.destroyWindow("crop")
                 return
-            else:
-                raise Exception("Wrong Key input")
             label_info.append((box_pt1, box_pt2, _class))
-            cv2.rectangle(img, box_pt1, box_pt2, (32, 216, 32), 1, cv2.LINE_AA)
+            cv2.rectangle(img, box_pt1, box_pt2, b_color, 1, cv2.LINE_AA)
             box_point = []
             cv2.destroyWindow("crop")
             print(label_info)
@@ -76,10 +77,9 @@ def draw_event(event, x, y, flags, param):
 
 def main(opt=None):
     get_logger().info(f"Start dv4 manual annotation script.")
-    IMGS_DIR = opt.imgs_dir
-    get_logger().info(f"Input Directory is {IMGS_DIR}")
+    IMGS_DIRS = opt.imgs_dir
+    get_logger().info(f"Input Directory is {IMGS_DIRS}")
 
-    # detector = ObjectDetector(cfg=cfg)
     obj_classes = defaultdict(int)
 
     if os.path.exists(opt.json_file):
@@ -115,102 +115,122 @@ def main(opt=None):
         anno_ids = 0
 
     is_out = False
-
     image_extension = ['.jpg', '.png', '.jpeg', '.bmp']
-    IMGS = [i for i in os.listdir(IMGS_DIR) if os.path.splitext(i)[-1].lower() in image_extension]
-    IMGS.sort()
-    for idx, i in enumerate(IMGS):
+
+    for IMGS_DIR in IMGS_DIRS:
         if is_out is True:
             break
 
-        img_file = os.path.join(IMGS_DIR, i)
-        get_logger().info(f"process {img_file}.")
-        f = cv2.imread(img_file)
-        if os.path.exists(img_file) is True and f is None:      # File 경로에 한글
-            f = open(img_file.encode("utf8"), mode="rb")
-            bs = bytearray(f.read())
-            arr = np.asarray(bs, dtype=np.uint8)
-            f = cv2.imdecode(arr, cv2.IMREAD_UNCHANGED)
+        IMGS = [i for i in os.listdir(IMGS_DIR) if os.path.splitext(i)[-1].lower() in image_extension]
+        IMGS.sort()
+        get_logger().info(f"process {IMGS_DIR} ..")
+        for idx, i in enumerate(IMGS):
+            if is_out is True:
+                break
 
-        winname = f"{idx + 1}/{len(IMGS)}"
-        cv2.namedWindow(winname)
-        cv2.setMouseCallback(winname, draw_event, winname)
+            img_file = os.path.join(IMGS_DIR, i)
+            get_logger().info(f"process {img_file}.")
+            f0 = cv2.imread(img_file)
+            if os.path.exists(img_file) is True and f0 is None:      # File 경로에 한글
+                f0 = open(img_file.encode("utf8"), mode="rb")
+                bs = bytearray(f0.read())
+                arr = np.asarray(bs, dtype=np.uint8)
+                f0 = cv2.imdecode(arr, cv2.IMREAD_UNCHANGED)
+            # Connect click event
+            winname = f"{idx + 1}/{len(IMGS)}"
+            cv2.namedWindow(winname)
+            cv2.setMouseCallback(winname, draw_event, winname)
 
-        img_info = {
-            "id": img_ids,
-            "license": 1,
-            "file_name": os.path.join(opt.type, i),
-            "height": f.shape[0],
-            "width": f.shape[1],
-            "data_captured": datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-        }
+            img_info = {
+                "id": img_ids,
+                "license": 1,
+                "file_name": os.path.join(opt.type, i),
+                "height": f0.shape[0],
+                "width": f0.shape[1],
+                "data_captured": datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+            }
 
-        # image resize
-        orig_img_size = (f.shape[0], f.shape[1])
-        edit_img_size = orig_img_size
-        global img
-        img = f
-        while f.shape[0] >= 1080:
-            f = cv2.resize(f, (int(f.shape[1] * 0.8), int(f.shape[0] * 0.8)))
-            img = f
-            edit_img_size = (f.shape[0], f.shape[1])
+            # bbox annotation
+            c_id = defaultdict(int)
+            tmp_annos = []
 
-        cv2.imshow(winname, f)
-        k = cv2.waitKey(0)
-        if k == ord('q'):
-            get_logger().info("-- CV2 Stop --")
-            break
-        elif k == ord(" "):
-            global label_info
-            for l_info in label_info:
-                pt1, pt2 = l_info[0], l_info[1]
-                rel_pt1 = (pt1[0] / edit_img_size[1], pt1[1] / edit_img_size[0])
-                rel_pt2 = (pt2[0] / edit_img_size[1], pt2[1] / edit_img_size[0])
-                orig_pt1 = (int(rel_pt1[0] * orig_img_size[1]), int(rel_pt1[1] * orig_img_size[0]))
-                orig_pt2 = (int(rel_pt2[0] * orig_img_size[1]), int(rel_pt2[1] * orig_img_size[0]))
-                w = int(orig_pt2[0] - orig_pt1[0])
-                h = int(orig_pt2[1] - orig_pt1[1])
+            f1 = f0.copy()
+            # image resize
+            orig_img_size = (f0.shape[0], f0.shape[1])
+            edit_img_size = orig_img_size
+            global img, label_info
+            img = f1
+            while f1.shape[0] >= 1080:
+                f1 = cv2.resize(f1, (int(f1.shape[1] * 0.8), int(f1.shape[0] * 0.8)))
+                img = f1
+                edit_img_size = (f1.shape[0], f1.shape[1])
+            cv2.imshow(winname, f1)
 
-                anno_info = {
-                    "id": anno_ids,
-                    "image_id": img_ids,
-                    "category_id": l_info[2],
-                    "bbox": [orig_pt1[0], orig_pt1[1], w, h],
-                    "area": w * h,
-                    "segmentation": [],
-                    "iscrowd": 0
-                }
-                anno_ids += 1
-                basic_fmt["annotations"].append(anno_info)
-                obj_classes[l_info[2]] += 1
+            k = cv2.waitKey(0)
+            cv2.destroyAllWindows()
+            if k == ord('q'):
+                get_logger().info("-- CV2 Stop --")
+                is_out = True
+                break
+            elif k == ord(" "):
+                for l_info in label_info:
+                    pt1, pt2 = l_info[0], l_info[1]
+                    rel_pt1 = (pt1[0] / edit_img_size[1], pt1[1] / edit_img_size[0])
+                    rel_pt2 = (pt2[0] / edit_img_size[1], pt2[1] / edit_img_size[0])
+                    orig_pt1 = (int(rel_pt1[0] * orig_img_size[1]), int(rel_pt1[1] * orig_img_size[0]))
+                    orig_pt2 = (int(rel_pt2[0] * orig_img_size[1]), int(rel_pt2[1] * orig_img_size[0]))
+                    w = int(orig_pt2[0] - orig_pt1[0])
+                    h = int(orig_pt2[1] - orig_pt1[1])
 
-            basic_fmt["images"].append(img_info)
-            img_ids += 1
-            get_logger().info(
-                f"Save label {img_file}. Add {len(label_info)} boxes."
-            )
+                    anno_info = {
+                        "id": anno_ids,
+                        "image_id": img_ids,
+                        "category_id": l_info[2],
+                        "bbox": [orig_pt1[0], orig_pt1[1], w, h],
+                        "area": w * h,
+                        "segmentation": [],
+                        "iscrowd": 0
+                    }
+                    anno_ids += 1
+                    tmp_annos.append(anno_info)
+                    c_id[l_info[2]] += 1
 
-            label_info = []
-        cv2.destroyWindow(winname)
+                if is_out is False:
+                    basic_fmt["images"].append(img_info)
+                    for k, v in c_id.items():
+                        obj_classes[k] += v
+                    for _anno_info in tmp_annos:
+                        basic_fmt["annotations"].append(_anno_info)
+                    get_logger().info(
+                        f"Save label {img_file}. Add {len(label_info)} boxes."
+                    )
+                label_info = []
 
-        new_path = os.path.join(IMGS_DIR, opt.type, i)
-        if not os.path.exists(os.path.dirname(new_path)):
-            os.makedirs(os.path.dirname(new_path))
-        shutil.move(img_file, new_path)
+                new_path = os.path.join(IMGS_DIR, opt.type, i)
+                if not os.path.exists(os.path.dirname(new_path)):
+                    os.makedirs(os.path.dirname(new_path))
+                shutil.move(img_file, new_path)
+                img_ids += 1
+            else:
+                label_info = []
+                continue
 
-    with open(os.path.join(opt.json_file), 'w') as outfile:
-        json.dump(basic_fmt, outfile, indent=2)
+    with open(opt.json_file, 'w') as outfile:
+        json.dump(basic_fmt, outfile, indent=2, ensure_ascii=False)
+
     get_logger().info(f"obj classes: {obj_classes}")
 
 
 def args_parse():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--imgs_dir', required=True,
+    parser.add_argument('-i', '--imgs_dir', required=True, nargs='+',
                         help='image directory path')
     parser.add_argument('-j', '--json_file', required=True,
                         help="if write this file, append annotations")
     parser.add_argument('-t', '--type', default='train',
                         help='type is in [train, val]. this option write file_path {type}/img_file')
+    parser.add_argument('-c', '--config', default='./configs/annotate.yaml',
+                        help="annotation configuration yaml file path")
     _args = parser.parse_args()
     return _args
 
@@ -218,7 +238,7 @@ def args_parse():
 if __name__ == "__main__":
     args = args_parse()
 
-    update_config(cfg, args='./configs/annotate.yaml')
+    update_config(cfg, args=args.config)
     init_logger(cfg)
 
     main(args)

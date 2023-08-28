@@ -69,13 +69,11 @@ def draw_event(event, x, y, flags, param):
                 b_color = (216, 16, 16)  # male blue
             elif key == ord("2"):
                 _class = 2
-                b_color = (16, 16, 224)  # female red
-            elif key == ord("d"):
+                b_color = (16, 16, 216)  # female red
+            else:
                 box_point = []
                 cv2.destroyWindow("crop")
                 return
-            else:
-                raise Exception("Wrong Key input")
             label_info.append((box_pt1, box_pt2, _class))
             cv2.rectangle(img, box_pt1, box_pt2, b_color, 1, cv2.LINE_AA)
             box_point = []
@@ -175,14 +173,13 @@ def main(opt=None):
             tmp_annos = []
 
             f1 = f0.copy()
-            im_h, im_w = f0.shape[0], f0.shape[1]
+            # Draw boxes
             for d in _det:
                 x1, y1, x2, y2 = map(int, d[:4])
-                w, h = x2 - x1, y2 - y1
                 _cls_idx = int(d[5])
-                if _cls_idx == 0:       # female
+                if detector.names[_cls_idx] == 'female':
                     b_color = (128, 128, 255)
-                elif _cls_idx == 1:     # male
+                elif detector.names[_cls_idx] == 'male':     # male
                     b_color = (255, 128, 128)
                 else:
                     raise Exception("Wrong Class index")
@@ -193,7 +190,7 @@ def main(opt=None):
             edit_img_size = orig_img_size
             global img, label_info
             img = f1
-            while f1.shape[0] > 1000:
+            while f1.shape[0] >= 1080:
                 f1 = cv2.resize(f1, (int(f1.shape[1] * 0.8), int(f1.shape[0] * 0.8)))
                 img = f1
                 edit_img_size = (f1.shape[0], f1.shape[1])
@@ -240,6 +237,7 @@ def main(opt=None):
                              "iscrowd": 0}
                 tmp_annos.append(anno_info)
                 anno_ids += 1
+                c_id[category_id] += 1
 
             k = cv2.waitKey(0)
             cv2.destroyAllWindows()
@@ -304,8 +302,8 @@ def args_parse():
                         help="if write this file, append annotations")
     parser.add_argument('-t', '--type', default='train',
                         help='type is in [train, val]. this option write file_path {type}/img_file')
-    parser.add_argument('-c', '--confidence', default=0.3, type=float,
-                        help="obj_detector confidence")
+    parser.add_argument('-c', '--config', default='./configs/annotate.yaml',
+                        help="annotation configuration yaml file path")
     _args = parser.parse_args()
     return _args
 
@@ -313,7 +311,7 @@ def args_parse():
 if __name__ == "__main__":
     args = args_parse()
 
-    update_config(cfg, args='./configs/annotate.yaml')
+    update_config(cfg, args=args.config)
     init_logger(cfg)
 
     main(args)

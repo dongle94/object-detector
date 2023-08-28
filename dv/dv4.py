@@ -358,7 +358,7 @@ class SetAreaDialog(QDialog):
         # Main Widget 으로 전달해주기
         main_widget = self.parent()
         main_widget.analysis_area.append(polygon)
-        main_widget.set_image_area(self.frame, self.polygons, f_size=self.img_size)
+        main_widget.set_image_area(self.frame, [self.polygons[-1]], f_size=self.img_size)
         # 초기화
         self.polygon = []
 

@@ -194,7 +194,7 @@ def main(opt=None):
             global img, label_info
             img = f1
             while f1.shape[0] > 1000:
-                f1 = cv2.resize(f1, (int(im_w * 0.8), int(im_h * 0.8)))
+                f1 = cv2.resize(f1, (int(f1.shape[1] * 0.8), int(f1.shape[0] * 0.8)))
                 img = f1
                 edit_img_size = (f1.shape[0], f1.shape[1])
             cv2.imshow(winname, f1)

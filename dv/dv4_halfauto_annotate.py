@@ -14,7 +14,6 @@ from collections import defaultdict
 import cv2
 import shutil
 import numpy as np
-import platform
 
 from pathlib import Path
 
@@ -70,13 +69,11 @@ def draw_event(event, x, y, flags, param):
                 b_color = (216, 16, 16)  # male blue
             elif key == ord("2"):
                 _class = 2
-                b_color = (16, 16, 224)  # female red
-            elif key == ord("d"):
+                b_color = (16, 16, 216)  # female red
+            else:
                 box_point = []
                 cv2.destroyWindow("crop")
                 return
-            else:
-                raise Exception("Wrong Key input")
             label_info.append((box_pt1, box_pt2, _class))
             cv2.rectangle(img, box_pt1, box_pt2, b_color, 1, cv2.LINE_AA)
             box_point = []
@@ -91,7 +88,7 @@ def draw_event(event, x, y, flags, param):
 
 
 def main(opt=None):
-    get_logger().info(f"Start dv4 auto annotation script.")
+    get_logger().info(f"Start dv4 halfauto annotation script.")
     IMGS_DIRS = opt.imgs_dir
     get_logger().info(f"Input Directory is {IMGS_DIRS}")
 
@@ -148,11 +145,11 @@ def main(opt=None):
             get_logger().info(f"process {img_file}.")
             f0 = cv2.imread(img_file)
             if os.path.exists(img_file) is True and f0 is None:  # File 경로에 한글
-                f = open(img_file.encode("utf8"), mode="rb")
-                bs = bytearray(f.read())
+                f0 = open(img_file.encode("utf8"), mode="rb")
+                bs = bytearray(f0.read())
                 arr = np.asarray(bs, dtype=np.uint8)
-                f = cv2.imdecode(arr, cv2.IMREAD_UNCHANGED)
-
+                f0 = cv2.imdecode(arr, cv2.IMREAD_UNCHANGED)
+            # Connect click event
             winname = f"{idx + 1}/{len(IMGS)}"
             cv2.namedWindow(winname)
             cv2.setMouseCallback(winname, draw_event, winname)
@@ -176,13 +173,16 @@ def main(opt=None):
             tmp_annos = []
 
             f1 = f0.copy()
-            im_h, im_w = f0.shape[0], f0.shape[1]
-            _det = [_d for _d in _det if _d[4] >= float(opt.confidence)]
+            # Draw boxes
             for d in _det:
                 x1, y1, x2, y2 = map(int, d[:4])
-                w, h = x2 - x1, y2 - y1
-
-                b_color = (16, 216, 16)
+                _cls_idx = int(d[5])
+                if detector.names[_cls_idx] == 'female':
+                    b_color = (128, 128, 255)
+                elif detector.names[_cls_idx] == 'male':     # male
+                    b_color = (255, 128, 128)
+                else:
+                    raise Exception("Wrong Class index")
                 cv2.rectangle(f1, (x1, y1), (x2, y2), b_color, thickness=1, lineType=cv2.LINE_AA)
 
             # image resize
@@ -190,8 +190,8 @@ def main(opt=None):
             edit_img_size = orig_img_size
             global img, label_info
             img = f1
-            while f1.shape[0] > 1000:
-                f1 = cv2.resize(f1, (int(im_w * 0.8), int(im_h * 0.8)))
+            while f1.shape[0] >= 1080:
+                f1 = cv2.resize(f1, (int(f1.shape[1] * 0.8), int(f1.shape[0] * 0.8)))
                 img = f1
                 edit_img_size = (f1.shape[0], f1.shape[1])
             cv2.imshow(winname, f1)
@@ -237,6 +237,7 @@ def main(opt=None):
                              "iscrowd": 0}
                 tmp_annos.append(anno_info)
                 anno_ids += 1
+                c_id[category_id] += 1
 
             k = cv2.waitKey(0)
             cv2.destroyAllWindows()
@@ -287,9 +288,8 @@ def main(opt=None):
                 label_info = []
                 continue
 
-    with open(os.path.join(opt.json_file), 'w') as outfile:
-        ensure_ascii = False if platform.system() == 'Windows' else True
-        json.dump(basic_fmt, outfile, indent=2, ensure_ascii=ensure_ascii)
+    with open(opt.json_file, 'w') as outfile:
+        json.dump(basic_fmt, outfile, indent=2, ensure_ascii=False)
 
     get_logger().info(f"obj classes: {obj_classes}")
 
@@ -302,8 +302,8 @@ def args_parse():
                         help="if write this file, append annotations")
     parser.add_argument('-t', '--type', default='train',
                         help='type is in [train, val]. this option write file_path {type}/img_file')
-    parser.add_argument('-c', '--confidence', default=0.3, type=float,
-                        help="obj_detector confidence")
+    parser.add_argument('-c', '--config', default='./configs/annotate.yaml',
+                        help="annotation configuration yaml file path")
     _args = parser.parse_args()
     return _args
 
@@ -311,7 +311,7 @@ def args_parse():
 if __name__ == "__main__":
     args = args_parse()
 
-    update_config(cfg, args='./configs/annotate.yaml')
+    update_config(cfg, args=args.config)
     init_logger(cfg)
 
     main(args)

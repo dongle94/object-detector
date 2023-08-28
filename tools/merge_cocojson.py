@@ -60,6 +60,7 @@ def main(opt):
         json.dump(basic_fmt, outfile, indent=2, ensure_ascii=False)
     print("Merge success. stop program.")
 
+
 def args_parse():
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--inputs', required=True, nargs='+',
@@ -68,6 +69,7 @@ def args_parse():
                         help='output json file path')
     _args = parser.parse_args()
     return _args
+
 
 if __name__ == "__main__":
     args = args_parse()

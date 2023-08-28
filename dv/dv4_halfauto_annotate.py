@@ -14,7 +14,6 @@ from collections import defaultdict
 import cv2
 import shutil
 import numpy as np
-import platform
 
 from pathlib import Path
 
@@ -91,7 +90,7 @@ def draw_event(event, x, y, flags, param):
 
 
 def main(opt=None):
-    get_logger().info(f"Start dv4 auto annotation script.")
+    get_logger().info(f"Start dv4 halfauto annotation script.")
     IMGS_DIRS = opt.imgs_dir
     get_logger().info(f"Input Directory is {IMGS_DIRS}")
 
@@ -177,7 +176,6 @@ def main(opt=None):
 
             f1 = f0.copy()
             im_h, im_w = f0.shape[0], f0.shape[1]
-            _det = [_d for _d in _det if _d[4] >= float(opt.confidence)]
             for d in _det:
                 x1, y1, x2, y2 = map(int, d[:4])
                 w, h = x2 - x1, y2 - y1

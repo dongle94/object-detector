@@ -292,9 +292,8 @@ def main(opt=None):
                 label_info = []
                 continue
 
-    with open(os.path.join(opt.json_file), 'w') as outfile:
-        ensure_ascii = False if platform.system() == 'Windows' else True
-        json.dump(basic_fmt, outfile, indent=2, ensure_ascii=ensure_ascii)
+    with open(opt.json_file, 'w') as outfile:
+        json.dump(basic_fmt, outfile, indent=2, ensure_ascii=False)
 
     get_logger().info(f"obj classes: {obj_classes}")
 

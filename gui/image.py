@@ -92,3 +92,25 @@ class PolygonOverlayLabel(QLabel):
 
         # draw
         qp.drawPolygon(polygon)
+
+
+class EllipseLabel(QLabel):
+    def __init__(self, size, line_color=(0, 0, 0), fill_color=(128, 128, 128)):
+        super().__init__()
+
+        self.draw_size = size
+        self.line_color = line_color
+        self.fill_color = fill_color
+
+    def paintEvent(self, e):
+        qp = QPainter()
+        qp.begin(self)
+        self.draw_ellipse(qp)
+        qp.end()
+
+    def draw_ellipse(self, qp):
+        qp.setPen(QPen(QColor(*self.line_color), 1))
+        qp.setBrush(QBrush(QColor(*self.fill_color), Qt.SolidPattern))
+        qp.drawEllipse(*self.draw_size)
+
+

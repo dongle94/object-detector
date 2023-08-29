@@ -229,7 +229,7 @@ class AnalysisThread(QThread):
                                     elif self.id_cnt[_id] > 10:
                                         self.t_box_data[_id]['last_modified_time'] = time.time()
                                     self.id_cnt[_id] += 1
-
+                                break
             del_list = []
             for _id, data in self.t_box_data.items():
                 if'last_modified_time' in data:

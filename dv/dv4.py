@@ -250,12 +250,17 @@ class AnalysisThread(QThread):
             for b in _boxes:
                 x1, y1, x2, y2 = b.x1, b.y1, b.x2, b.y2
                 if b.tracking_id != -1:
+                    b_color = (128, 255, 128)
+                    # if b.class_name == 'male':
+                    #     b_color = (255, 128, 128)
+                    # elif b.class_name == 'female':
+                    #     b_color = (128, 128, 255)
                     cv2.rectangle(frame, (x1, y1), (x2, y2),
-                                  color=(96, 216, 96),
+                                  color=b_color,
                                   thickness=2, lineType=cv2.LINE_AA)
-                    cv2.putText(frame, text=f"({b.class_name})ID: {b.tracking_id}",
-                                org=(b.x1, b.y1+10), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5,
-                                color=(96, 96, 216), thickness=2)
+                    cv2.putText(frame, text=f"{b.class_name}-{b.tracking_id}",
+                                org=(b.x1, b.y1+10), fontFace=cv2.FONT_ITALIC, fontScale=0.5,
+                                color=(48, 48, 248), thickness=2)
 
             self.viewer.img_label.draw.emit(frame, True)
             t3 = time.time()

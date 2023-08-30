@@ -30,6 +30,7 @@ class AnalysisThread(QThread):
     def __init__(self, parent, input_path=None, detector=None, tracker=None, img_viewer=None):
         super().__init__(parent=parent)
         self.logger = get_logger()
+        self.cfg = parent.config
 
         # input source
         self.input_path = input_path
@@ -110,7 +111,7 @@ class AnalysisThread(QThread):
             for _box in _boxes:
                 self.id_cnt[_box.tracking_id] += 1          # 등록 횟수
 
-                if self.id_cnt[_box.tracking_id] == 10:      # 실제 카운트 인정하기 위한 등록 횟수
+                if self.id_cnt[_box.tracking_id] == self.cfg.REGISTER_FRAME:      # 실제 카운트 인정하기 위한 등록 횟수
                     self.class_cnt[_box.class_name] += 1
                     # 분석 결과 업데이트
 
@@ -118,7 +119,6 @@ class AnalysisThread(QThread):
                     for k, v in self.class_cnt.items():
                         _txt += f"{k:10s} : {v}\n"
                     self.lb_result.updateText.emit(_txt)
-                    # self.lb_result.setText.emit(_txt)
 
             # visualize
             for b in _boxes:

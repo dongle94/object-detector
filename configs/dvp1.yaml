@@ -13,6 +13,7 @@ TRACK_USE_ENCODER: true
 TRACK_MODEL_TYPE: "deepocsort"
 TRACK_MODEL_PATH: "./weights/osnet_x0_25_market1501.pt"
 TRACK_HALF: false
+REGISTER_FRAME: 30
 
 # Logger
 LOG_LEVEL: 'info'

@@ -125,6 +125,7 @@ class AnalysisThread(QThread):
     def __init__(self, parent, input_path=None, detector=None, tracker=None, polygons=[]):
         super().__init__(parent=parent)
         self.logger = get_logger()
+        self.cfg = parent.config
         self.logger.info("Create AnalysisThread.")
 
         self.sbar = self.parent().sbar
@@ -219,12 +220,12 @@ class AnalysisThread(QThread):
                                             'class_name': self.detector.names[int(cls)],
                                             'access_time': time.time()
                                         }
-                                    elif self.id_cnt[_id] == 10:  # 실제 카운트 인정
+                                    elif self.id_cnt[_id] == self.cfg.REGISTER_FRAME:  # 실제 카운트 인정
                                         if int(_id) not in self.analysis_result.data['checked_id']:
                                             self.analysis_result.data['object_cnt'][bbox.class_name] += 1
                                             self.analysis_result.data['checked_id'].append(int(_id))
                                         self.t_box_data[_id]['last_modified_time'] = time.time()
-                                    elif self.id_cnt[_id] > 10:
+                                    elif self.id_cnt[_id] > self.cfg.REGISTER_FRAME:
                                         self.t_box_data[_id]['last_modified_time'] = time.time()
                                     self.id_cnt[_id] += 1
                                 break

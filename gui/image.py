@@ -4,6 +4,8 @@ from PySide6.QtWidgets import QWidget, QDialog, QLabel, QVBoxLayout
 from PySide6.QtGui import QImage, QPixmap, QPainter, QPolygon, QPen, QColor, QBrush, QPaintEvent
 from PySide6.QtCore import Qt, Signal
 
+from .widget import NormalLabel
+
 
 class ImgDialog(QDialog):
     def __init__(self, parent=None, title="", modality=Qt.WindowModality.NonModal, polygon=False):
@@ -63,16 +65,7 @@ class ImgWidget(QWidget):
         self.img_label.setScaledContents(scale)
 
 
-class NormalLabel(QLabel):
-    draw = Signal(numpy.ndarray, bool)
-
-    def __init__(self):
-        super().__init__()
-
-
-class PolygonOverlayLabel(QLabel):
-    draw = Signal(numpy.ndarray, bool)
-
+class PolygonOverlayLabel(NormalLabel):
     def __init__(self):
         super().__init__()
 
@@ -101,7 +94,7 @@ class PolygonOverlayLabel(QLabel):
         qp.drawPolygon(polygon)
 
 
-class EllipseLabel(QLabel):
+class EllipseLabel(NormalLabel):
     updateFillColor = Signal(tuple)
     updateLineColor = Signal(tuple)
     updateSize = Signal(tuple)

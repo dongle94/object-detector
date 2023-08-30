@@ -49,7 +49,7 @@ PROD = [
         "name": "제품 2",
         "chicken": ["닭볶음용1.3kg", 30],
         "sauce1": ["허니버터소스1kg", 15],
-        "sauce2": ["", 15],
+        "sauce2": [],
         "powder": ["시즈닝500g", 30],
         "quantity": 30,
     },
@@ -78,7 +78,6 @@ PROD = [
         "powder": ["뿌링클링시즈닝150g", 50]
     },
 ]
-
 PROD_CLASS = {
     "태음융융소금염지닭": 0,
     "닭윙1.3kg": 1,
@@ -120,6 +119,8 @@ class AnalysisThread(QThread):
     def __init__(self, parent=None, medialoader=None, statusbar=None, detector=None, tracker=None, img_viewer=None,
                  logger=None):
         super().__init__(parent=parent)
+        self.cfg = parent.config
+
         self.medialoader = medialoader if medialoader is not None else self.parent().medialoader
         self.sbar = statusbar if statusbar is not None else self.parent().sbar
         self.detector = detector if detector else self.parent().obj_detector
@@ -443,7 +444,7 @@ class MainWidget(QWidget):
 
         # Set Input Loader
         try:
-            self.medialoader = MediaLoader(source="0", logger=self.logger, opt=cfg)
+            self.medialoader = MediaLoader(source=cfg.MEDIA_SOURCE, logger=self.logger, opt=cfg)
             self.medialoader.start()
             self.medialoader.pause()
         except Exception as e:

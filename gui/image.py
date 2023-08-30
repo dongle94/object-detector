@@ -11,7 +11,7 @@ class ImgDialog(QDialog):
 
         # self.img = QImage()
         layout = QVBoxLayout()
-        self.img_label = PolygonOverlayLabel() if polygon is True else QLabel()
+        self.img_label = PolygonOverlayLabel() if polygon is True else NormalLabel()
         self.img_pixmap = QPixmap()
         layout.addWidget(self.img_label)
 
@@ -41,7 +41,7 @@ class ImgWidget(QWidget):
 
         # self.img = QImage()
         layout = QVBoxLayout()
-        self.img_label = PolygonOverlayLabel() if polygon is True else QLabel()
+        self.img_label = PolygonOverlayLabel() if polygon is True else NormalLabel()
         self.img_pixmap = QPixmap()
         layout.addWidget(self.img_label)
 
@@ -61,6 +61,13 @@ class ImgWidget(QWidget):
         self.img_label.setPixmap(self.img_pixmap)
         self.img_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.img_label.setScaledContents(scale)
+
+
+class NormalLabel(QLabel):
+    draw = Signal(numpy.ndarray, bool)
+
+    def __init__(self):
+        super().__init__()
 
 
 class PolygonOverlayLabel(QLabel):
@@ -95,6 +102,10 @@ class PolygonOverlayLabel(QLabel):
 
 
 class EllipseLabel(QLabel):
+    updateFillColor = Signal(tuple)
+    updateLineColor = Signal(tuple)
+    updateSize = Signal(tuple)
+
     def __init__(self, size, line_color=(0, 0, 0), fill_color=(128, 128, 128)):
         super().__init__()
 

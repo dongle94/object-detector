@@ -289,7 +289,7 @@ def main(opt=None):
                 elif _k == ord('3'):     # unknown
                     category_id = 3
                     b_color = (16, 248, 16)
-                elif _k == ord('d'):
+                else:
                     cv2.destroyWindow(b_name)
                     img = f1
                     cv2.imshow(winname, f1)

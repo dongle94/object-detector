@@ -203,7 +203,8 @@ def main(opt=None):
                 h = int(orig_pt2[1] - orig_pt1[1])
                 box_point = []
             else:
-                raise Exception("2 points not clicked!")
+                print("2 points not clicked!")
+                break
             anno_info = {
                 "id": anno_ids,
                 "image_id": img_ids,

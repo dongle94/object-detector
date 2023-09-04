@@ -55,7 +55,6 @@ def main(opt):
                 basic_fmt['annotations'].append(json_anno)
                 anno_ids += 1
 
-    print(basic_fmt)
     with open(opt.output, 'w') as outfile:
         json.dump(basic_fmt, outfile, indent=2, ensure_ascii=False)
     print("Merge success. stop program.")

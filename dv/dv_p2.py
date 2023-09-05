@@ -12,15 +12,57 @@ import cv2
 from collections import defaultdict
 
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget
-from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QPushButton, QLabel
-from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QFileDialog, QProgressBar
+from PySide6.QtCore import Qt, Slot, Signal, QThread
+
+from pathlib import Path
+FILE = Path(__file__).resolve()
+ROOT = FILE.parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))  # add ROOT to PATH
+os.chdir(ROOT)
+
 from gui.image import ImgWidget, EllipseLabel
 
-from utils.medialoader import MediaLoader
 from utils.config import _C as cfg, update_config
 from utils.logger import init_logger, get_logger
+from utils.medialoader import MediaLoader
 from core.obj_detectors import ObjectDetector
 
+
+class AnalysisThread(QThread):
+    def __init__(self, parent, input_path=None, detector=None, head_detector=None, img_viewer=None):
+        super().__init__(parent=parent)
+        self.logger = get_logger()
+        self.cfg = parent.config
+
+        # input source
+        self.input_path = input_path
+        self.media_loader = MediaLoader(source=input_path, logger=self.logger, realtime=False)
+        self.viewer = img_viewer
+        self.lb_result = self.parent().num_process
+
+        # analysis module
+        self.detector = detector
+        self.head_detector = head_detector
+
+        self.class_cnt = defaultdict(int)
+        for v in self.detector.names.values():
+            self.class_cnt[v] = 0
+
+    def run(self) -> None:
+        self.logger.info("Start analysis.")
+
+        self.media_loader.start()
+        while True:
+            frame = self.media_loader.get_frame()
+            if frame is None:
+                break
+
+            self.viewer.img_label.draw.emit(frame, True)
+
+
+        self.logger.info("Analysis Thraed - 영상 분석 종료")
 
 
 class MainWidget(QWidget):
@@ -33,6 +75,20 @@ class MainWidget(QWidget):
         self.logger.info("Create Main QWidget - start")
 
         self.setupUi()
+
+        # Slots & Signals
+        self.bt_find_video.clicked.connect(self.find_video)
+        self.bt_process.clicked.connect(self.process)
+
+        # Analysis
+        self.obj_detector = None
+        # self.obj_detector = ObjectDetector(cfg=self.config)
+        self.config.defrost()
+        self.config.DET_MODEL_PATH = './weights/crowdhuman_yolov5m.pt'
+        self.config.freeze()
+        self.head_detector = None
+        # self.head_detector = ObjectDetector(cfg=self.config)
+        self.analysis_thread = None
 
     def setupUi(self):
         self.frame_width = self.parent().size().width()
@@ -74,6 +130,9 @@ class MainWidget(QWidget):
         self.c_imgWidget = ImgWidget()
         self.c_imgWidget.setFixedSize(int(self.frame_width * 0.25), int(self.frame_height * 0.25))
 
+        self.pbar = QProgressBar()
+        self.pbar.setFixedSize(int(self.frame_width * 0.25), int(self.frame_height * 0.02))
+
         self.c_result = QVBoxLayout()
         self.num_process = QLabel("")
         self.c_result.addWidget(QLabel("[상세 내용]"), 10, alignment=Qt.AlignmentFlag.AlignCenter)
@@ -82,6 +141,7 @@ class MainWidget(QWidget):
         self.layer_0_middle.addLayout(self.c_status, 7)
         self.layer_0_middle.addLayout(self.c_mosaic, 7)
         self.layer_0_middle.addWidget(self.c_imgWidget, 30, Qt.AlignmentFlag.AlignCenter)
+        self.layer_0_middle.addWidget(self.pbar, alignment=Qt.AlignmentFlag.AlignHCenter)
         self.layer_0_middle.addLayout(self.c_result, 55)
 
         self.widget_0.setLayout(self.layer_0)
@@ -106,6 +166,32 @@ class MainWidget(QWidget):
         # self.main_layout.addLayout(self.layer_0, 80)
         self.main_layout.addWidget(self.widget_0, 80)
         self.main_layout.addLayout(self.layer_1, 20)
+
+    @Slot()
+    def find_video(self):
+        f_name = QFileDialog.getOpenFileName(parent=self, caption="비디오 파일 선택",
+                                             filter="All Files(*);;"
+                                                    "Videos(*.webm);;"
+                                                    "Videos(*.mp4 *.avi *m4v *.mpg *mpeg);;"
+                                                    "Videos(*.wmv *.mov *.mkv *.flv)")
+        self.logger.info(f"Find Video - {f_name}")
+
+        if self.analysis_thread is None:
+            self.analysis_thread = AnalysisThread(
+                parent=self,
+                input_path=f_name[0],
+                detector=self.obj_detector,
+                head_detector=self.head_detector,
+                img_viewer=self.c_imgWidget
+            )
+
+        self.parent().statusBar().showMessage(f"{f_name[0]}")
+
+    @Slot()
+    def process(self):
+        self.logger.info("Click - bt_process button.")
+
+        self.analysis_thread.start()
 
 
 class P2(QMainWindow):

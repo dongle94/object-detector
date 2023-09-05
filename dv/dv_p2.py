@@ -40,15 +40,22 @@ class AnalysisThread(QThread):
         self.input_path = input_path
         self.media_loader = MediaLoader(source=input_path, logger=self.logger, realtime=False)
         self.viewer = img_viewer
+        self.side_viewers = [self.parent().imgWidget_0, self.parent().imgWidget_1, self.parent().imgWidget_2,
+                             self.parent().imgWidget_3, self.parent().imgWidget_4, self.parent().imgWidget_5]
         self.lb_result = self.parent().num_process
+        self.num_frames = int(self.media_loader.cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
         # analysis module
         self.detector = detector
         self.head_detector = head_detector
 
+        # analysis logging
         self.class_cnt = defaultdict(int)
-        for v in self.detector.names.values():
-            self.class_cnt[v] = 0
+        # for v in self.detector.names.values():
+        #     self.class_cnt[v] = 0
+
+        self.f_cnt = 0
+        self.log_interval = self.parent().config.CONSOLE_LOG_INTERVAL
 
     def run(self) -> None:
         self.logger.info("Start analysis.")
@@ -56,10 +63,28 @@ class AnalysisThread(QThread):
         self.media_loader.start()
         while True:
             frame = self.media_loader.get_frame()
-            if frame is None:
+            if frame is None or len(frame.shape) < 2:
                 break
-
             self.viewer.img_label.draw.emit(frame, True)
+
+            # logging
+            self.f_cnt += 1
+            if self.f_cnt % self.log_interval == 0:
+                self.logger.info(f"[{self.f_cnt} Frame]")
+
+            if int(self.num_frames * 1 / 7) == self.f_cnt:
+                self.side_viewers[0].img_label.draw.emit(frame, True)
+            elif int(self.num_frames * 2 / 7) == self.f_cnt:
+                self.side_viewers[1].img_label.draw.emit(frame, True)
+            elif int(self.num_frames * 3 / 7) == self.f_cnt:
+                self.side_viewers[2].img_label.draw.emit(frame, True)
+            elif int(self.num_frames * 4 / 7) == self.f_cnt:
+                self.side_viewers[3].img_label.draw.emit(frame, True)
+            elif int(self.num_frames * 5 / 7) == self.f_cnt:
+                self.side_viewers[4].img_label.draw.emit(frame, True)
+            elif int(self.num_frames * 6 / 7) == self.f_cnt:
+                self.side_viewers[5].img_label.draw.emit(frame, True)
+
 
 
         self.logger.info("Analysis Thraed - 영상 분석 종료")
@@ -79,6 +104,13 @@ class MainWidget(QWidget):
         # Slots & Signals
         self.bt_find_video.clicked.connect(self.find_video)
         self.bt_process.clicked.connect(self.process)
+        self.c_imgWidget.img_label.draw.connect(self.draw_img)
+        self.imgWidget_0.img_label.draw.connect(self.draw_img0)
+        self.imgWidget_1.img_label.draw.connect(self.draw_img1)
+        self.imgWidget_2.img_label.draw.connect(self.draw_img2)
+        self.imgWidget_3.img_label.draw.connect(self.draw_img3)
+        self.imgWidget_4.img_label.draw.connect(self.draw_img4)
+        self.imgWidget_5.img_label.draw.connect(self.draw_img5)
 
         # Analysis
         self.obj_detector = None
@@ -101,11 +133,17 @@ class MainWidget(QWidget):
         self.layer_0_middle = QVBoxLayout()
         self.layer_0_right = QVBoxLayout()
         self.imgWidget_0 = ImgWidget()
+        self.imgWidget_0.setFixedSize(int(self.frame_width * 0.3), int(self.frame_height * 0.3))
         self.imgWidget_1 = ImgWidget()
+        self.imgWidget_1.setFixedSize(int(self.frame_width * 0.3), int(self.frame_height * 0.3))
         self.imgWidget_2 = ImgWidget()
+        self.imgWidget_2.setFixedSize(int(self.frame_width * 0.3), int(self.frame_height * 0.3))
         self.imgWidget_3 = ImgWidget()
+        self.imgWidget_3.setFixedSize(int(self.frame_width * 0.3), int(self.frame_height * 0.3))
         self.imgWidget_4 = ImgWidget()
+        self.imgWidget_4.setFixedSize(int(self.frame_width * 0.3), int(self.frame_height * 0.3))
         self.imgWidget_5 = ImgWidget()
+        self.imgWidget_5.setFixedSize(int(self.frame_width * 0.3), int(self.frame_height * 0.3))
 
         self.layer_0_left.addWidget(self.imgWidget_0)
         self.layer_0_left.addWidget(self.imgWidget_1)
@@ -192,6 +230,34 @@ class MainWidget(QWidget):
         self.logger.info("Click - bt_process button.")
 
         self.analysis_thread.start()
+
+    @Slot()
+    def draw_img(self, img, scale=False):
+        self.c_imgWidget.set_array(img, scale)
+
+    @Slot()
+    def draw_img0(self, img, scale=False):
+        self.imgWidget_0.set_array(img, scale)
+
+    @Slot()
+    def draw_img1(self, img, scale=False):
+        self.imgWidget_1.set_array(img, scale)
+
+    @Slot()
+    def draw_img2(self, img, scale=False):
+        self.imgWidget_2.set_array(img, scale)
+
+    @Slot()
+    def draw_img3(self, img, scale=False):
+        self.imgWidget_3.set_array(img, scale)
+
+    @Slot()
+    def draw_img4(self, img, scale=False):
+        self.imgWidget_4.set_array(img, scale)
+
+    @Slot()
+    def draw_img5(self, img, scale=False):
+        self.imgWidget_5.set_array(img, scale)
 
 
 class P2(QMainWindow):

@@ -15,6 +15,14 @@ from PySide6.QtWidgets import QApplication, QMainWindow, QWidget
 from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QFileDialog
 from PySide6.QtCore import Qt, Slot, QThread, Signal
 from PySide6.QtGui import QFont
+
+from pathlib import Path
+FILE = Path(__file__).resolve()
+ROOT = FILE.parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))  # add ROOT to PATH
+os.chdir(ROOT)
+
 from gui.image import ImgWidget, EllipseLabel
 from gui.widget import NormalLabel
 

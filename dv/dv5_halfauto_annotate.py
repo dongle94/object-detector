@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-datavoucher 5 - quamtomai
+datavoucher 5 - quantumai
 human group object classes by gender: homo, hetero, unknown
+custom trained model detection result
+detection based select(include discard) + manual labeling
 """
 import json
 import os
@@ -14,6 +16,7 @@ import shutil
 import numpy as np
 
 from pathlib import Path
+
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[1]
 if str(ROOT) not in sys.path:
@@ -49,71 +52,27 @@ def get_box_point(pt1, pt2):
     return new_pt1, new_pt2
 
 
-def get_l2_norm(boxes):
-    _det = []
-    for b in boxes:
-        x1, y1, x2, y2 = map(int, b[:4])
-        w, h = x2-x1, y2-y1
-        cx, cy = int((x1+x2)/2), int((y1+y2)/2)
-        d = ((2 * 3.14 * 180) / (w + h * 360) * 1000 + 3)
-        _det.append(np.asarray((cx, cy, d)))
-    arr = np.zeros((len(boxes), len(boxes)), dtype=np.float32)
-
-    for i, d1 in enumerate(_det[:]):
-        for j, d2 in enumerate(_det[:]):
-            arr[i, j] = np.sqrt(np.sum(np.power(d1-d2, 2)))
-    return arr
-
-
-def get_closed_boxes(arr, threshold=100):
-    length = arr.shape[0]
-    ret = []
-    for i in range(length):
-        for j in range(i+1, length, 1):
-            if arr[i, j] < threshold:
-                ret.append((i, j))
-    return ret
-
-
-def get_merge_boxes(boxes, box_pair):
-    new_boxes = []
-    for p in box_pair:
-        ax1, ay1, ax2, ay2 = map(int, boxes[p[0]][:4])
-        bx1, by1, bx2, by2 = map(int, boxes[p[1]][:4])
-        x1 = min(ax1, bx1)
-        y1 = min(ay1, by1)
-        x2 = max(ax2, bx2)
-        y2 = max(ay2, by2)
-
-        cls_1 = boxes[p[0]][5]
-        cls_2 = boxes[p[1]][5]
-        group_cls = 1 if cls_1 == cls_2 else 2
-
-        new_boxes.append((x1, y1, x2, y2, group_cls))
-    return new_boxes
-
-
 def draw_event(event, x, y, flags, param):
     global mouseX, mouseY, img, box_point, label_info
     if event == cv2.EVENT_LBUTTONDOWN:
         mouseX, mouseY = x, y
-        cv2.circle(img, (x, y), 2, (32, 216, 32), -1)
+        cv2.circle(img, (x, y), 3, (32, 216, 32), -1)
         box_point.append((x, y))
         if len(box_point) == 2:
             box_pt1, box_pt2 = get_box_point(box_point[0], box_point[1])
             crop_img = img[box_pt1[1]:box_pt2[1], box_pt1[0]:box_pt2[0]]
             cv2.imshow("crop", crop_img)
             key = cv2.waitKey(0)
-
-            if key == ord("1"):          # homo
+            _class = 0
+            if key == ord("1"):
                 _class = 1
-                b_color = (248, 16, 16)
-            elif key == ord("2"):       # hetero
+                b_color = (216, 16, 16)  # homo blue
+            elif key == ord("2"):
                 _class = 2
-                b_color = (16, 16, 248)
-            elif key == ord("3"):       # unknown
+                b_color = (16, 16, 216)  # hetero red
+            elif key == ord("3"):
                 _class = 3
-                b_color = (16, 248, 16)
+                b_color = (16, 216, 16)  # unknown green
             else:
                 box_point = []
                 cv2.destroyWindow("crop")
@@ -122,8 +81,7 @@ def draw_event(event, x, y, flags, param):
             cv2.rectangle(img, box_pt1, box_pt2, b_color, 1, cv2.LINE_AA)
             box_point = []
             cv2.destroyWindow("crop")
-            cv2.imshow(param, img)
-
+            print(label_info)
     if event == cv2.EVENT_MOUSEMOVE:
         im = img.copy()
         img_size = im.shape
@@ -131,8 +89,9 @@ def draw_event(event, x, y, flags, param):
         cv2.line(im, (0, y), (img_size[1], y), (0, 0, 0), 1, cv2.LINE_AA)
         cv2.imshow(param, im)
 
+
 def main(opt=None):
-    get_logger().info(f"Start dv5 annotation script.")
+    get_logger().info(f"Start dv4 halfauto annotation script.")
     IMGS_DIRS = opt.imgs_dir
     get_logger().info(f"Input Directory is {IMGS_DIRS}")
 
@@ -140,15 +99,15 @@ def main(opt=None):
 
     obj_classes = defaultdict(int)
 
-    img_ids = 0
-    anno_ids = 0
     if os.path.exists(opt.json_file):
         with open(opt.json_file, 'r') as file:
             basic_fmt = json.load(file)
         get_logger().info(f"{opt.json_file} is exist. append annotation file.")
+        img_ids = 0
         if len(basic_fmt['images']) != 0:
             img_ids = int(basic_fmt['images'][-1]['id']) + 1
             get_logger().info(f"last image file name: {basic_fmt['images'][-1]['file_name']}")
+        anno_ids = 0
         if len(basic_fmt['annotations']) != 0:
             anno_ids = int(basic_fmt["annotations"][-1]['id']) + 1
             for anno in basic_fmt['annotations']:
@@ -158,7 +117,7 @@ def main(opt=None):
         get_logger().info(f"{opt.json_file} is not exist. Create new annotation file")
         basic_fmt = {
             "info": {"year": "2023", "version": "1",
-                     "description": "datavoucher group people object detection ",
+                     "description": "datavoucher human gender object detection dataset.",
                      "contributor": "",
                      "url": "",
                      "date_created": datetime.now().strftime("%Y-%m-%dT%H:%M:%S")},
@@ -170,16 +129,17 @@ def main(opt=None):
             "images": [],
             "annotations": []
         }
+        img_ids = 0
+        anno_ids = 0
 
     is_out = False
     image_extension = ['.jpg', '.png', '.jpeg', '.bmp']
-
     for IMGS_DIR in IMGS_DIRS:
         if is_out is True:
             break
 
         IMGS = [i for i in os.listdir(IMGS_DIR) if os.path.splitext(i)[-1].lower() in image_extension]
-        IMGS.sort()
+        # IMGS.sort()
         get_logger().info(f"process {IMGS_DIR} ..")
         for idx, i in enumerate(IMGS):
             if is_out is True:
@@ -193,7 +153,6 @@ def main(opt=None):
                 bs = bytearray(f0.read())
                 arr = np.asarray(bs, dtype=np.uint8)
                 f0 = cv2.imdecode(arr, cv2.IMREAD_UNCHANGED)
-
             # Connect click event
             winname = f"{idx + 1}/{len(IMGS)}"
             cv2.namedWindow(winname)
@@ -214,28 +173,23 @@ def main(opt=None):
             }
 
             # bbox annotation
-            _arr = get_l2_norm(_det)
-            _boxes = get_closed_boxes(_arr, threshold=120)
-            _new_boxes = get_merge_boxes(_det, _boxes)
-            get_logger().info(f"pair boxes: {_boxes}")
-
             c_id = defaultdict(int)
             tmp_annos = []
 
             f1 = f0.copy()
-            # draw whole boxes in images
-            for idx, d in enumerate(_det):
+            # Draw boxes
+            for d in _det:
                 x1, y1, x2, y2 = map(int, d[:4])
                 _cls_idx = int(d[5])
-                b_color = (128, 255, 128)
-                if detector.names[_cls_idx] == 'female':
-                    b_color = (192, 192, 255)
-                elif detector.names[_cls_idx] == 'male':     # male
-                    b_color = (255, 192, 192)
-
+                if detector.names[_cls_idx] == 'homo':
+                    b_color = (255, 128, 128)
+                elif detector.names[_cls_idx] == 'hetero':     # male
+                    b_color = (128, 128, 255)
+                elif detector.names[_cls_idx] == 'unknown':
+                    b_color = (128, 255, 128)
+                else:
+                    raise Exception("Wrong Class index")
                 cv2.rectangle(f1, (x1, y1), (x2, y2), b_color, thickness=1, lineType=cv2.LINE_AA)
-                cv2.putText(f1, f"{idx}", (x1+10, y1+20), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-                            fontScale=0.5, color=(255, 16, 16), thickness=2)
 
             # image resize
             orig_img_size = (f0.shape[0], f0.shape[1])
@@ -248,56 +202,38 @@ def main(opt=None):
                 edit_img_size = (f1.shape[0], f1.shape[1])
             cv2.imshow(winname, f1)
 
-            # draw group box
             auto_box = 0
-            for _idx, d in enumerate(_new_boxes):
-                f2 = f1.copy()
-                x1, y1, x2, y2 = d[:4]
-                cls = int(d[4])
-                b_color = (16, 255, 16)
-                if cls == 1:    # homo(동성그룹)   초록색
-                    b_color = (48, 232, 48)
-                elif cls == 2:  # hetero(이성그룹) 노랑색
-                    b_color = (232, 232, 48)
-                w, h = x2-x1, y2-y1
+            for _idx, d in enumerate(_det):
+                x1, y1, x2, y2 = map(int, d[:4])
+                w, h = x2 - x1, y2 - y1
+                _cls_idx = int(d[5])
+                crop_image = f0[y1:y2, x1:x2]
+                b_name = f"{_idx+1}/{len(_det)}"
+                cv2.imshow(b_name, crop_image)
 
                 nx1, ny1 = cvtPoint(x1, y1, orig_img_size, edit_img_size)
                 nx2, ny2 = cvtPoint(x2, y2, orig_img_size, edit_img_size)
-                cv2.rectangle(f2, (nx1, ny1), (nx2, ny2), b_color, thickness=2, lineType=cv2.LINE_AA)
-                img = f2
-                cv2.imshow(winname, f2)
 
-                new_frame = f0[y1:y2, x1:x2]
-                b_name = f"{_idx + 1}/{len(_new_boxes)}"
-                cv2.imshow(b_name, new_frame)
-
-                category_id = 0
                 _k = cv2.waitKey(0)
-
                 if _k == ord('q'):
                     get_logger().info("-- CV2 Stop --")
                     is_out = True
                     cv2.destroyWindow(b_name)
-                    cv2.imshow(winname, f1)
-                    img = f1
                     break
-                elif _k == ord('1'):     # homo
+                elif _k == ord('1'):
                     category_id = 1
-                    b_color = (248, 16, 16)
-                elif _k == ord('2'):     # hetero
+                    b_color = (216, 16, 16)  # homo blue
+                elif _k == ord('2'):
                     category_id = 2
-                    b_color = (16, 16, 248)
-                elif _k == ord('3'):     # unknown
+                    b_color = (16, 16, 216)  # hetero red
+                elif _k == ord('3'):
                     category_id = 3
-                    b_color = (16, 248, 16)
+                    b_color = (16, 216, 16)  # homo blue
                 else:
                     cv2.destroyWindow(b_name)
-                    img = f1
-                    cv2.imshow(winname, f1)
                     continue
                 auto_box += 1
                 cv2.rectangle(f1, (nx1, ny1), (nx2, ny2), b_color, thickness=1, lineType=cv2.LINE_AA)
-                img = f1
                 cv2.imshow(winname, f1)
                 cv2.destroyWindow(b_name)
 
@@ -305,7 +241,7 @@ def main(opt=None):
                              "image_id": img_ids,
                              "category_id": category_id,
                              "bbox": [x1, y1, w, h],
-                             "area": w*h,
+                             "area": w * h,
                              "segmentation": [],
                              "iscrowd": 0}
                 tmp_annos.append(anno_info)
@@ -321,15 +257,18 @@ def main(opt=None):
             elif k == ord(" "):
                 for l_info in label_info:
                     pt1, pt2 = l_info[0], l_info[1]
-                    x1, y1 = cvtPoint(pt1[0], pt1[1], edit_img_size, orig_img_size)
-                    x2, y2 = cvtPoint(pt2[0], pt2[1], edit_img_size, orig_img_size)
-                    w = int(x2 - x1)
-                    h = int(y2 - y1)
+                    rel_pt1 = (pt1[0] / edit_img_size[1], pt1[1] / edit_img_size[0])
+                    rel_pt2 = (pt2[0] / edit_img_size[1], pt2[1] / edit_img_size[0])
+                    orig_pt1 = (int(rel_pt1[0] * orig_img_size[1]), int(rel_pt1[1] * orig_img_size[0]))
+                    orig_pt2 = (int(rel_pt2[0] * orig_img_size[1]), int(rel_pt2[1] * orig_img_size[0]))
+                    w = int(orig_pt2[0] - orig_pt1[0])
+                    h = int(orig_pt2[1] - orig_pt1[1])
+
                     anno_info = {
                         "id": anno_ids,
                         "image_id": img_ids,
                         "category_id": l_info[2],
-                        "bbox": [x1, y1, w, h],
+                        "bbox": [orig_pt1[0], orig_pt1[1], w, h],
                         "area": w * h,
                         "segmentation": [],
                         "iscrowd": 0
@@ -338,14 +277,15 @@ def main(opt=None):
                     tmp_annos.append(anno_info)
                     c_id[l_info[2]] += 1
 
-                basic_fmt["images"].append(img_info)
-                for k, v in c_id.items():
-                    obj_classes[k] += v
-                for _anno_info in tmp_annos:
-                    basic_fmt["annotations"].append(_anno_info)
-                get_logger().info(
-                    f"Save label {img_file}. Add {len(label_info) + auto_box} boxes."
-                )
+                if is_out is False:
+                    basic_fmt["images"].append(img_info)
+                    for k, v in c_id.items():
+                        obj_classes[k] += v
+                    for _anno_info in tmp_annos:
+                        basic_fmt["annotations"].append(_anno_info)
+                    get_logger().info(
+                        f"Save label {img_file}. Add {len(label_info) + auto_box} boxes."
+                    )
                 label_info = []
 
                 new_path = os.path.join(IMGS_DIR, opt.type, i)
@@ -353,9 +293,12 @@ def main(opt=None):
                     os.makedirs(os.path.dirname(new_path))
                 shutil.move(img_file, new_path)
                 img_ids += 1
+            else:
+                label_info = []
+                continue
 
-    with open(os.path.join(opt.json_file), 'w') as outfile:
-        json.dump(basic_fmt, outfile, indent=1)
+    with open(opt.json_file, 'w') as outfile:
+        json.dump(basic_fmt, outfile, indent=2, ensure_ascii=False)
 
     get_logger().info(f"obj classes: {obj_classes}")
 
@@ -368,7 +311,7 @@ def args_parse():
                         help="if write this file, append annotations")
     parser.add_argument('-t', '--type', default='train',
                         help='type is in [train, val]. this option write file_path {type}/img_file')
-    parser.add_argument('-c', '--config', default='./configs/annotate.yaml',
+    parser.add_argument('-c', '--config', default='./configs/dv5_annotate.yaml',
                         help="annotation configuration yaml file path")
     _args = parser.parse_args()
     return _args

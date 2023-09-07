@@ -9,6 +9,7 @@ import sys
 import argparse
 import time
 import cv2
+import numpy as np
 from collections import defaultdict
 
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget
@@ -30,6 +31,22 @@ from utils.medialoader import MediaLoader
 from core.obj_detectors import ObjectDetector
 
 
+def mosaic(img: np.ndarray, coord, block=10):
+    x1, y1, x2, y2 = coord
+    w, h = x2 - x1+1, y2 - y1+1
+    if w < block:
+        block /= 2
+    gap_w, gap_h = int(w/block), int(h/block)
+    if gap_w == 0 or gap_h == 0:
+        return
+    for c in range(3):
+        for ny in range(y1, y2, gap_h):
+            for nx in range(x1, x2, gap_w):
+                new_y = ny + gap_h + 1 if ny + gap_h < y2 else y2
+                new_x = nx + gap_w + 1 if nx + gap_w < x2 else x2
+                img[ny:new_y, nx:new_x, c] = np.mean(img[ny:new_y, nx:new_x, c])
+
+
 class AnalysisThread(QThread):
     def __init__(self, parent, input_path=None, detector=None, head_detector=None, img_viewer=None):
         super().__init__(parent=parent)
@@ -44,6 +61,9 @@ class AnalysisThread(QThread):
                              self.parent().imgWidget_3, self.parent().imgWidget_4, self.parent().imgWidget_5]
         self.lb_result = self.parent().num_process
         self.num_frames = int(self.media_loader.cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+        # output source
+        self.vw = None
 
         # draw widget
         self.ellipse = self.parent().draw_1
@@ -65,12 +85,23 @@ class AnalysisThread(QThread):
         self.logger.info("Start analysis.")
 
         self.media_loader.start()
+        self.ellipse.updateFillColor.emit((216, 32, 32))
         while True:
             frame = self.media_loader.get_frame()
             if frame is None or len(frame.shape) < 2:
                 break
+
+            im = self.head_detector.preprocess(frame)
+            _pred = self.head_detector.detect(im)
+            _pred, _det = self.head_detector.postprocess(_pred)
+
+            for d in _det:
+                if d[5] == 1:
+                    x1, y1, x2, y2 = map(int, d[:4])
+                    mosaic(frame, (x1, y1, x2, y2), block=10)
+
             self.viewer.img_label.draw.emit(frame, True)
-            self.ellipse.updateFillColor.emit((216, 32, 32))
+
             # logging
             self.f_cnt += 1
             if self.f_cnt % self.log_interval == 0:
@@ -125,8 +156,7 @@ class MainWidget(QWidget):
         self.config.defrost()
         self.config.DET_MODEL_PATH = './weights/crowdhuman_yolov5m.pt'
         self.config.freeze()
-        self.head_detector = None
-        # self.head_detector = ObjectDetector(cfg=self.config)
+        self.head_detector = ObjectDetector(cfg=self.config)
         self.analysis_thread = None
 
     def setupUi(self):
@@ -236,6 +266,8 @@ class MainWidget(QWidget):
     def process(self):
         self.logger.info("Click - bt_process button.")
 
+        f_name = QFileDialog.getSaveFileName(parent=self, caption="비디오 파일 저장",
+                                             filter="Videos(*.mp4);;")
         self.analysis_thread.start()
 
     @Slot()

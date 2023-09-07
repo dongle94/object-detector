@@ -90,7 +90,6 @@ class AnalysisThread(QThread):
             frame = self.media_loader.get_frame()
             if frame is None or len(frame.shape) < 2:
                 break
-
             im = self.head_detector.preprocess(frame)
             _pred = self.head_detector.detect(im)
             _pred, _det = self.head_detector.postprocess(_pred)
@@ -102,11 +101,14 @@ class AnalysisThread(QThread):
 
             self.viewer.img_label.draw.emit(frame, True)
 
+            self.vw.write(frame)
+
             # logging
             self.f_cnt += 1
             if self.f_cnt % self.log_interval == 0:
                 self.logger.info(f"[{self.f_cnt} Frame]")
 
+            # Process Event
             if int(self.num_frames * 1 / 7) == self.f_cnt:
                 self.side_viewers[0].img_label.draw.emit(frame, True)
             elif int(self.num_frames * 2 / 7) == self.f_cnt:
@@ -121,7 +123,10 @@ class AnalysisThread(QThread):
                 self.side_viewers[5].img_label.draw.emit(frame, True)
 
             self.pbar.valueChanged.emit(int(self.f_cnt / self.num_frames * 100))
+
+        # End Process
         self.ellipse.updateFillColor.emit((0, 150, 75))
+        self.vw.release()
 
         self.logger.info("Analysis Thraed - 영상 분석 종료")
 
@@ -268,6 +273,17 @@ class MainWidget(QWidget):
 
         f_name = QFileDialog.getSaveFileName(parent=self, caption="비디오 파일 저장",
                                              filter="Videos(*.mp4);;")
+
+        filename = f_name[0] + '.mp4' if os.path.splitext(f_name[0]) != '.mp4' else f_name[0]
+        self.logger.info(f"Save Video - {filename}")
+        self.analysis_thread.vw = cv2.VideoWriter(
+            filename=filename,
+            fourcc=cv2.VideoWriter_fourcc(*'mp4v'),
+            fps=self.analysis_thread.media_loader.fps,
+            frameSize=(self.analysis_thread.media_loader.w, self.analysis_thread.media_loader.h),
+            isColor=True
+        )
+
         self.analysis_thread.start()
 
     @Slot()

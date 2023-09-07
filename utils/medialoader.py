@@ -92,8 +92,7 @@ class MediaLoader(object):
         if self.realtime is False:
             # if image array empty, wait for image
             while self.img is None:
-                time.sleep(0.001)
-                continue
+                return None
         else:   # realtime is true
             if self.img is None:
                 return None

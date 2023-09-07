@@ -38,12 +38,16 @@ class AnalysisThread(QThread):
 
         # input source
         self.input_path = input_path
-        self.media_loader = MediaLoader(source=input_path, logger=self.logger, realtime=False)
+        self.media_loader = MediaLoader(source=input_path, logger=self.logger, realtime=False, fast=True)
         self.viewer = img_viewer
         self.side_viewers = [self.parent().imgWidget_0, self.parent().imgWidget_1, self.parent().imgWidget_2,
                              self.parent().imgWidget_3, self.parent().imgWidget_4, self.parent().imgWidget_5]
         self.lb_result = self.parent().num_process
         self.num_frames = int(self.media_loader.cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+        # draw widget
+        self.ellipse = self.parent().draw_1
+        self.pbar = self.parent().pbar
 
         # analysis module
         self.detector = detector
@@ -66,7 +70,7 @@ class AnalysisThread(QThread):
             if frame is None or len(frame.shape) < 2:
                 break
             self.viewer.img_label.draw.emit(frame, True)
-
+            self.ellipse.updateFillColor.emit((216, 32, 32))
             # logging
             self.f_cnt += 1
             if self.f_cnt % self.log_interval == 0:
@@ -85,7 +89,8 @@ class AnalysisThread(QThread):
             elif int(self.num_frames * 6 / 7) == self.f_cnt:
                 self.side_viewers[5].img_label.draw.emit(frame, True)
 
-
+            self.pbar.valueChanged.emit(int(self.f_cnt / self.num_frames * 100))
+        self.ellipse.updateFillColor.emit((0, 150, 75))
 
         self.logger.info("Analysis Thraed - 영상 분석 종료")
 
@@ -111,6 +116,8 @@ class MainWidget(QWidget):
         self.imgWidget_3.img_label.draw.connect(self.draw_img3)
         self.imgWidget_4.img_label.draw.connect(self.draw_img4)
         self.imgWidget_5.img_label.draw.connect(self.draw_img5)
+        self.draw_1.updateFillColor.connect(self.change_fill_color)
+        self.pbar.valueChanged.connect(self.pbar.setValue)
 
         # Analysis
         self.obj_detector = None
@@ -258,6 +265,11 @@ class MainWidget(QWidget):
     @Slot()
     def draw_img5(self, img, scale=False):
         self.imgWidget_5.set_array(img, scale)
+
+    @Slot()
+    def change_fill_color(self, color):
+        self.draw_1.fill_color = color
+        self.draw_1.update()
 
 
 class P2(QMainWindow):

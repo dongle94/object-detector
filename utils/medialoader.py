@@ -20,7 +20,7 @@ def check_sources(source):
 
 
 class MediaLoader(object):
-    def __init__(self, source, stride=1, logger=None, realtime=True, opt=None):
+    def __init__(self, source, stride=1, logger=None, realtime=True, opt=None, fast=False):
         self.stride = stride
         self.realtime = realtime
         self.is_file, self.is_url, self.is_webcam = check_sources(source)
@@ -49,7 +49,7 @@ class MediaLoader(object):
 
         _, self.img = cap.read()
 
-        wait_ms = 1 / self.fps
+        wait_ms = 1 / self.fps if fast is False else 0
         self.thread = Thread(target=self.update, args=([cap, source, wait_ms]), daemon=True)
         print(f"-- Success ({self.frame} frames {self.w}x{self.h} at {self.fps:.2f} FPS)")
         self.alive = True

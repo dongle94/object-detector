@@ -249,23 +249,39 @@ class MainWidget(QWidget):
 
     @Slot()
     def find_video(self):
-        f_name = QFileDialog.getOpenFileName(parent=self, caption="비디오 파일 선택",
+        f_name, _ = QFileDialog.getOpenFileName(parent=self, caption="비디오 파일 선택",
                                              filter="All Files(*);;"
                                                     "Videos(*.webm);;"
-                                                    "Videos(*.mp4 *.avi *m4v *.mpg *mpeg);;"
+                                                    "Videos(*.mp4 *.avi *m4v *.mpg *.mpeg);;"
                                                     "Videos(*.wmv *.mov *.mkv *.flv)")
         self.logger.info(f"Find Video - {f_name}")
+        if f_name != "":
+            if self.analysis_thread is not None:
+                self.analysis_thread = None
+                self.c_imgWidget.img_label.clear()
+                self.imgWidget_0.img_label.clear()
+                self.imgWidget_1.img_label.clear()
+                self.imgWidget_2.img_label.clear()
+                self.imgWidget_3.img_label.clear()
+                self.imgWidget_4.img_label.clear()
+                self.imgWidget_5.img_label.clear()
+                self.change_fill_color((255, 216, 32))
+            if self.analysis_thread is None:
+                ml = MediaLoader(f_name, logger=get_logger(), realtime=False)
+                f = None
+                for _ in range(2):
+                    f = ml.get_one_frame()
+                del ml
+                self.c_imgWidget.set_array(f, True)
+                self.analysis_thread = AnalysisThread(
+                    parent=self,
+                    input_path=f_name,
+                    detector=self.obj_detector,
+                    head_detector=self.head_detector,
+                    img_viewer=self.c_imgWidget
+                )
 
-        if self.analysis_thread is None:
-            self.analysis_thread = AnalysisThread(
-                parent=self,
-                input_path=f_name[0],
-                detector=self.obj_detector,
-                head_detector=self.head_detector,
-                img_viewer=self.c_imgWidget
-            )
-
-        self.parent().statusBar().showMessage(f"{f_name[0]}")
+            self.parent().statusBar().showMessage(f"{f_name}")
 
     @Slot()
     def process(self):
@@ -275,7 +291,7 @@ class MainWidget(QWidget):
                                              dir=os.getenv("HOME"),
                                              filter="Videos(*.mp4);;")
         if f_name != "":
-            filename = f_name + '.mp4' if os.path.splitext(f_name)[1] != '.mp4' else f_name
+            filename = f_name + '.mp4' if os.path.splitext(f_name)[1] not in ['.mp4', '.webm', '.avi'] else f_name
             self.logger.info(f"Save Video - {filename}")
             self.analysis_thread.vw = cv2.VideoWriter(
                 filename=filename,

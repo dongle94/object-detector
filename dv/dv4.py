@@ -460,14 +460,13 @@ class MainWidget(QWidget):
         path = self.el_source.text()
         try:
             ml = MediaLoader(path, logger=get_logger(), realtime=False)
-            ml.start()
             f = None
             for _ in range(2):
-                f = ml.get_frame()
+                f = ml.get_one_frame()
             if self.set_dialog is None:
                 self.set_dialog = SetAreaDialog(img=f, parent=self)
             self.set_dialog.show()
-            ml.stop()
+            del ml
         except Exception as e:
             self.logger.warning(e)
             MsgDialog(parent=self,

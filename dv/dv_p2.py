@@ -271,20 +271,21 @@ class MainWidget(QWidget):
     def process(self):
         self.logger.info("Click - bt_process button.")
 
-        f_name = QFileDialog.getSaveFileName(parent=self, caption="비디오 파일 저장",
+        f_name, _ = QFileDialog.getSaveFileName(parent=self, caption="비디오 파일 저장",
+                                             dir=os.getenv("HOME"),
                                              filter="Videos(*.mp4);;")
+        if f_name != "":
+            filename = f_name + '.mp4' if os.path.splitext(f_name)[1] != '.mp4' else f_name
+            self.logger.info(f"Save Video - {filename}")
+            self.analysis_thread.vw = cv2.VideoWriter(
+                filename=filename,
+                fourcc=cv2.VideoWriter_fourcc(*'mp4v'),
+                fps=self.analysis_thread.media_loader.fps,
+                frameSize=(self.analysis_thread.media_loader.w, self.analysis_thread.media_loader.h),
+                isColor=True
+            )
 
-        filename = f_name[0] + '.mp4' if os.path.splitext(f_name[0]) != '.mp4' else f_name[0]
-        self.logger.info(f"Save Video - {filename}")
-        self.analysis_thread.vw = cv2.VideoWriter(
-            filename=filename,
-            fourcc=cv2.VideoWriter_fourcc(*'mp4v'),
-            fps=self.analysis_thread.media_loader.fps,
-            frameSize=(self.analysis_thread.media_loader.w, self.analysis_thread.media_loader.h),
-            isColor=True
-        )
-
-        self.analysis_thread.start()
+            self.analysis_thread.start()
 
     @Slot()
     def draw_img(self, img, scale=False):

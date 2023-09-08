@@ -87,6 +87,10 @@ class MediaLoader(object):
     def is_frame_ready(self):
         return True if self.img is not None else False
 
+    def get_one_frame(self):
+        ret, f = self.cap.read()
+        return f
+
     def get_frame(self):
         # get frame
         if self.realtime is False:

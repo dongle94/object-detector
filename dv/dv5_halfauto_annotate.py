@@ -139,7 +139,7 @@ def main(opt=None):
             break
 
         IMGS = [i for i in os.listdir(IMGS_DIR) if os.path.splitext(i)[-1].lower() in image_extension]
-        # IMGS.sort()
+        IMGS.sort()
         get_logger().info(f"process {IMGS_DIR} ..")
         for idx, i in enumerate(IMGS):
             if is_out is True:
@@ -254,6 +254,13 @@ def main(opt=None):
                 get_logger().info("-- CV2 Stop --")
                 is_out = True
                 break
+            elif k == ord("d"):
+                new_path = os.path.join(IMGS_DIR, 'discard', i)
+                if not os.path.exists(os.path.dirname(new_path)):
+                    os.makedirs(os.path.dirname(new_path))
+                shutil.move(img_file, new_path)
+                label_info = []
+                continue
             elif k == ord(" "):
                 for l_info in label_info:
                     pt1, pt2 = l_info[0], l_info[1]

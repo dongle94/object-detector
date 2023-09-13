@@ -100,6 +100,9 @@ def main(opt=None):
             _pred = detector.detect(im)
             _pred, _det = detector.postprocess(_pred)
 
+            if len(_det) == 0:
+                continue
+
             img_info = {
                 "id": img_ids,
                 "license": 1,

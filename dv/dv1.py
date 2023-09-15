@@ -213,7 +213,7 @@ class AnalysisThread(QThread):
                 for b in _boxes:
                     if b.tracking_id != -1:
                         cv2.rectangle(frame, (b.x1, b.y1), (b.x2, b.y2), (96, 96, 216), thickness=2, lineType=cv2.LINE_AA)
-                        font = ImageFont.truetype('./data/fonts/NanumMyeongjoEcoBold.ttf', 16)
+                        font = ImageFont.truetype('./data/fonts/NanumMyeongjoEcoBold.ttf', 20)
                         img_pil = Image.fromarray(frame)
                         img_draw = ImageDraw.Draw(img_pil)
                         img_draw.text((b.x1, b.y1 + 7), f"({b.class_name})ID: {b.tracking_id}", font=font, fill=(216, 96, 96))
@@ -224,7 +224,8 @@ class AnalysisThread(QThread):
                 # for i, (k, v) in enumerate(self.class_cnt.items()):
                 #     cv2.putText(frame, f"{k}({self.detector.names[k]}): {v}", (img_w - 150, 30 + i * 30),
                 #                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (32, 32, 32), 2)
-
+                while frame.shape[0] >= 1080:
+                    frame = cv2.resize(frame, (int(frame.shape[0] * 0.8), int(frame.shape[1] * 0.8)))
                 img = QImage(frame.data, frame.shape[1], frame.shape[0], QImage.Format.Format_BGR888)
                 self.viewer.set_image(img)
             t3 = time.time()

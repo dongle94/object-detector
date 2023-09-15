@@ -184,6 +184,7 @@ class AnalysisThread(QThread):
             _pred, _det = self.detector.postprocess(_pred)
 
             t1 = time.time()
+            _boxes = []
             # tracking
             if len(_det):
                 track_ret = self.tracker.update(_det, frame)

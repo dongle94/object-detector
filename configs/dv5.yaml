@@ -3,10 +3,10 @@ DEVICE: 0
 
 # Object Detector
 DET_MODEL_TYPE: "yolo"
-DET_MODEL_PATH: './weights/yolov5m6.pt'
+DET_MODEL_PATH: './weights/quantum_s6.pt'
 IMG_SIZE: 1280
-HALF: false
-OBJ_CLASSES: [0, 1, 2, 3]   # None or [0, 1, 2, 3...]
+HALF: true
+OBJ_CLASSES: None   # None or [0, 1, 2, 3...]
 
 # Object Tracker
 TRACK_USE_ENCODER: true
@@ -16,9 +16,9 @@ TRACK_HALF: false
 REGISTER_FRAME: 30
 
 # Logger
-LOG_LEVEL: 'info'
+LOG_LEVEL: 'debug'
 CONSOLE_LOG: true
-CONSOLE_LOG_INTERVAL: 10
+CONSOLE_LOG_INTERVAL: 100
 LOGGER_NAME: "DV5"
 FILE_LOG: true
 LOG_FILE_DIR: './log/'

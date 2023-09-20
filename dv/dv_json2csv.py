@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-
+converting tool for datavoucher coco json to csv
 """
 
 import json
 import csv
-import os
 import argparse
 
 
@@ -17,7 +16,6 @@ def main(opt):
         json_data = json.load(file)
 
     annos = json_data["annotations"]
-
 
     with open(output_csv, mode='w', newline='') as f:
         wr = csv.writer(f)

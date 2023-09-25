@@ -14,6 +14,7 @@ from collections import defaultdict
 import cv2
 import shutil
 import numpy as np
+import screeninfo
 
 from pathlib import Path
 FILE = Path(__file__).resolve()
@@ -69,8 +70,8 @@ def draw_event(event, x, y, flags, param):
     if event == cv2.EVENT_MOUSEMOVE:
         im = img.copy()
         img_size = im.shape
-        cv2.line(im, (x, 0), (x, img_size[0]), (0, 0, 0), 2, cv2.LINE_AA)
-        cv2.line(im, (0, y), (img_size[1], y), (0, 0, 0), 2, cv2.LINE_AA)
+        cv2.line(im, (x, 0), (x, img_size[0]), (0, 0, 0), 1, cv2.LINE_AA)
+        cv2.line(im, (0, y), (img_size[1], y), (0, 0, 0), 1, cv2.LINE_AA)
         cv2.imshow(param, im)
 
 
@@ -82,6 +83,12 @@ def main(opt=None):
     detector = ObjectDetector(cfg=cfg) if cfg.DET_MODEL_PATH != "" else None
 
     obj_classes = defaultdict(int)
+
+    screen_h = 0
+    for m in screeninfo.get_monitors():
+        if m.is_primary is True:
+            screen_h = m.height
+            break
 
     if os.path.exists(opt.json_file):
         with open(opt.json_file, 'r') as file:
@@ -169,14 +176,9 @@ def main(opt=None):
             for d in _det:
                 x1, y1, x2, y2 = map(int, d[:4])
                 _cls_idx = int(d[5])
-                if detector.names[_cls_idx] == 'knife':
-                    b_color = (216, 48, 216)
-                elif detector.names[_cls_idx] == 'cigarette':
-                    b_color = (48, 48, 216)
-                elif detector.names[_cls_idx] == 'axe':
-                    b_color = (216, 48, 48)
-                elif detector.names[_cls_idx] == 'gun':\
-                    b_color = (48, 216, 48)
+                b_color = (216, 48, 48)
+                if detector.names[_cls_idx] in ['knife', 'cigarette', 'axe', 'gun']:
+                    pass
                 else:
                     raise Exception(f"Wrong Class index: {_cls_idx}")
                 cv2.rectangle(f1, (x1, y1), (x2, y2), b_color, thickness=1, lineType=cv2.LINE_AA)
@@ -192,7 +194,7 @@ def main(opt=None):
         edit_img_size = orig_img_size
         global img
         img = f1
-        while f1.shape[0] >= 1080:
+        while f1.shape[0] >= screen_h * 0.95:
             f1 = cv2.resize(f1, (int(f1.shape[1] * 0.8), int(f1.shape[0] * 0.8)))
             img = f1
             edit_img_size = (f1.shape[0], f1.shape[1])
@@ -206,9 +208,9 @@ def main(opt=None):
                 w, h = x2 - x1, y2 - y1
                 _cls_idx = int(d[5])
                 crop_image = f0[y1:y2, x1:x2]
-                while crop_image.shape[0] >= 1080:
+                while crop_image.shape[0] >= screen_h * 0.5:
                     crop_image = cv2.resize(crop_image,
-                                            (int(crop_image.shape[1] * 0.5), int(crop_image.shape[0] * 0.5)))
+                                            (int(crop_image.shape[1] * 0.8), int(crop_image.shape[0] * 0.8)))
                 b_name = f"{_idx + 1}/{len(_det)}"
                 cv2.imshow(b_name, crop_image)
 
@@ -217,8 +219,7 @@ def main(opt=None):
 
                 _k = cv2.waitKey(0)
                 if _k == ord('q'):
-                    get_logger().info("-- CV2 Stop --")
-                    is_out = True
+                    get_logger().info("-- Close Crop Window --")
                     cv2.destroyWindow(b_name)
                     break
                 elif _k == ord(' '):
@@ -284,13 +285,14 @@ def main(opt=None):
                     get_logger().info(
                         f"Save label {img_file}. Add {len(box_point)/2 + auto_box} boxes."
                     )
-                box_point = []
 
-                new_path = os.path.join(IMGS_DIR, opt.type, i)
-                if not os.path.exists(os.path.dirname(new_path)):
-                    os.makedirs(os.path.dirname(new_path))
-                shutil.move(img_file, new_path)
-                img_ids += 1
+                    new_path = os.path.join(IMGS_DIR, opt.type, i)
+                    if not os.path.exists(os.path.dirname(new_path)):
+                        os.makedirs(os.path.dirname(new_path))
+                    shutil.move(img_file, new_path)
+                    img_ids += 1
+
+                    box_point = []
             else:
                 box_point = []
                 print("2 points not clicked!")
@@ -300,7 +302,6 @@ def main(opt=None):
             get_logger().info(f"Pass image {img_file}.")
             cv2.destroyAllWindows()
             continue
-
 
     with open(os.path.join(opt.json_file), 'w') as outfile:
         json.dump(basic_fmt, outfile, indent=1, ensure_ascii=False)
@@ -316,7 +317,7 @@ def args_parse():
     parser.add_argument('-t', '--type', default='train',
                         help='type is in [train, val]. this option write file_path {type}/img_file')
     parser.add_argument('-cn', '--class_num', required=True, type=int, choices=[1, 2, 3, 4],
-                        help="object class number 1~3")
+                        help="object class number 1~4")
     parser.add_argument('-c', '--config', default='./configs/dvp2.yaml',
                         help="annotate.yaml config file path")
     _args = parser.parse_args()

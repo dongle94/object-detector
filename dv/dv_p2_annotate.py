@@ -25,11 +25,21 @@ os.chdir(ROOT)
 from utils.config import _C as cfg
 from utils.config import update_config
 from utils.logger import get_logger, init_logger
+from core.obj_detectors import ObjectDetector
 
 
 img = None
 mouseX, mouseY = 0, 0
 box_point = []
+
+
+def cvtPoint(x, y, orig_size, cvt_size):
+    orig_h, orig_w = orig_size
+    cvt_h, cvt_w = cvt_size
+
+    new_x = int(x / orig_w * cvt_w)
+    new_y = int(y / orig_h * cvt_h)
+    return new_x, new_y
 
 
 def get_box_point(pt1, pt2):
@@ -69,6 +79,8 @@ def main(opt=None):
     IMGS_DIR = opt.imgs_dir
     get_logger().info(f"Input Directory is {IMGS_DIR}")
 
+    detector = ObjectDetector(cfg=cfg) if cfg.DET_MODEL_PATH != "" else None
+
     obj_classes = defaultdict(int)
 
     if os.path.exists(opt.json_file):
@@ -96,9 +108,11 @@ def main(opt=None):
             "licenses": [{"id": 1, "url": "", "name": "Unknown"}],
             "categories": [
                 {"id": 0, "name": "background", "supercategory": "background"},
-                {"id": 1, "name": "knife", "supercategory": "garbage"},
-                {"id": 2, "name": "cigarette", "supercategory": "garbage"},
-                {"id": 3, "name": "weapon", "supercategory": "garbage"}
+                {"id": 1, "name": "knife", "supercategory": "dangerous"},
+                {"id": 2, "name": "cigarette", "supercategory": "dangerous"},
+                #{"id": 3, "name": "weapon", "supercategory": "dangerous"}
+                {"id": 3, "name": "gun", "supercategory": "dangerous"},
+                {"id": 4, "name": "axe", "supercategory": "dangerous"}
             ],
             "images": [],
             "annotations": []
@@ -109,9 +123,13 @@ def main(opt=None):
     image_extension = ['.jpg', '.png', '.jpeg', '.bmp']
 
     IMGS = [i for i in os.listdir(IMGS_DIR) if os.path.splitext(i)[-1].lower() in image_extension]
-    IMGS.sort()
+    # IMGS.sort()
 
+    is_out = False
     for idx, i in enumerate(IMGS):
+        if is_out is True:
+            break
+
         img_file = os.path.join(IMGS_DIR, i)
         get_logger().info(f"process {img_file}.")
         f0 = cv2.imread(img_file)
@@ -126,6 +144,12 @@ def main(opt=None):
         cv2.namedWindow(winname)
         cv2.setMouseCallback(winname, draw_event, winname)
 
+        # yolov5 human detector
+        if detector is not None:
+            im = detector.preprocess(f0)
+            _pred = detector.detect(im)
+            _pred, _det = detector.postprocess(_pred)
+
         img_info = {
             "id": img_ids,
             "license": 1,
@@ -135,10 +159,35 @@ def main(opt=None):
             "data_captured": datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
         }
 
+        # bbox annotation
+        c_id = defaultdict(int)
         tmp_annos = []
 
-        # image resize
         f1 = f0.copy()
+        # Draw boxes
+        if detector is not None:
+            for d in _det:
+                x1, y1, x2, y2 = map(int, d[:4])
+                _cls_idx = int(d[5])
+                if detector.names[_cls_idx] == 'knife':
+                    b_color = (216, 48, 216)
+                elif detector.names[_cls_idx] == 'cigarette':
+                    b_color = (48, 48, 216)
+                elif detector.names[_cls_idx] == 'axe':
+                    b_color = (216, 48, 48)
+                elif detector.names[_cls_idx] == 'gun':\
+                    b_color = (48, 216, 48)
+                else:
+                    raise Exception(f"Wrong Class index: {_cls_idx}")
+                cv2.rectangle(f1, (x1, y1), (x2, y2), b_color, thickness=1, lineType=cv2.LINE_AA)
+                cv2.putText(f1,
+                            f"Class: {_cls_idx, detector.names[_cls_idx]}",
+                            (x1+4, y1+25),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            1,
+                            (0, 0, 255), 1)
+
+        # image resize
         orig_img_size = (f0.shape[0], f0.shape[1])
         edit_img_size = orig_img_size
         global img
@@ -147,16 +196,61 @@ def main(opt=None):
             f1 = cv2.resize(f1, (int(f1.shape[1] * 0.8), int(f1.shape[0] * 0.8)))
             img = f1
             edit_img_size = (f1.shape[0], f1.shape[1])
-
-        # winname에 한글 입력 불가
         cv2.imshow(winname, f1)
 
+        auto_box = 0
+        # auto labeling
+        if detector is not None:
+            for _idx, d in enumerate(_det):
+                x1, y1, x2, y2 = map(int, d[:4])
+                w, h = x2 - x1, y2 - y1
+                _cls_idx = int(d[5])
+                crop_image = f0[y1:y2, x1:x2]
+                while crop_image.shape[0] >= 1080:
+                    crop_image = cv2.resize(crop_image,
+                                            (int(crop_image.shape[1] * 0.5), int(crop_image.shape[0] * 0.5)))
+                b_name = f"{_idx + 1}/{len(_det)}"
+                cv2.imshow(b_name, crop_image)
+
+                nx1, ny1 = cvtPoint(x1, y1, orig_img_size, edit_img_size)
+                nx2, ny2 = cvtPoint(x2, y2, orig_img_size, edit_img_size)
+
+                _k = cv2.waitKey(0)
+                if _k == ord('q'):
+                    get_logger().info("-- CV2 Stop --")
+                    is_out = True
+                    cv2.destroyWindow(b_name)
+                    break
+                elif _k == ord(' '):
+                    category_id = _cls_idx
+                    b_color = (48, 216, 216)
+                else:
+                    cv2.destroyWindow(b_name)
+                    continue
+                auto_box += 1
+                cv2.rectangle(f1, (nx1, ny1), (nx2, ny2), b_color, thickness=1, lineType=cv2.LINE_AA)
+                cv2.imshow(winname, f1)
+                cv2.destroyWindow(b_name)
+
+                anno_info = {"id": anno_ids,
+                             "image_id": img_ids,
+                             "category_id": category_id,
+                             "bbox": [x1, y1, w, h],
+                             "area": w * h,
+                             "segmentation": [],
+                             "iscrowd": 0}
+                tmp_annos.append(anno_info)
+                anno_ids += 1
+                c_id[category_id] += 1
+
         k = cv2.waitKey(0)
+        cv2.destroyAllWindows()
+        global box_point
         if k == ord('q'):
             get_logger().info("-- CV2 Stop --")
+            is_out = True
             break
         elif k == ord(" "):
-            global box_point
             if len(box_point) % 2 == 0:
                 for box_i in range(0, len(box_point), 2):
                     pt1, pt2 = get_box_point(box_point[box_i], box_point[box_i+1])
@@ -176,14 +270,20 @@ def main(opt=None):
                         "segmentation": [],
                         "iscrowd": 0
                     }
-                    tmp_annos.append(anno_info)
                     anno_ids += 1
-                    obj_classes[opt.class_num] += 1
+                    tmp_annos.append(anno_info)
+                    c_id[opt.class_num] += 1
 
                 # add annotation
-                basic_fmt["images"].append(img_info)
-                for _anno_info in tmp_annos:
-                    basic_fmt["annotations"].append(_anno_info)
+                if is_out is False:
+                    basic_fmt["images"].append(img_info)
+                    for k, v in c_id.items():
+                        obj_classes[k] += v
+                    for _anno_info in tmp_annos:
+                        basic_fmt["annotations"].append(_anno_info)
+                    get_logger().info(
+                        f"Save label {img_file}. Add {len(box_point)/2 + auto_box} boxes."
+                    )
                 box_point = []
 
                 new_path = os.path.join(IMGS_DIR, opt.type, i)
@@ -191,18 +291,16 @@ def main(opt=None):
                     os.makedirs(os.path.dirname(new_path))
                 shutil.move(img_file, new_path)
                 img_ids += 1
-
-                get_logger().info(
-                    f"Save label {img_file}. Add {len(box_point)} boxes."
-                )
-
             else:
+                box_point = []
                 print("2 points not clicked!")
                 break
         else:
+            box_point = []
+            get_logger().info(f"Pass image {img_file}.")
+            cv2.destroyAllWindows()
             continue
 
-        cv2.destroyAllWindows()
 
     with open(os.path.join(opt.json_file), 'w') as outfile:
         json.dump(basic_fmt, outfile, indent=1, ensure_ascii=False)
@@ -217,9 +315,9 @@ def args_parse():
                         help="if write this file, append annotations")
     parser.add_argument('-t', '--type', default='train',
                         help='type is in [train, val]. this option write file_path {type}/img_file')
-    parser.add_argument('-cn', '--class_num', required=True, type=int,
+    parser.add_argument('-cn', '--class_num', required=True, type=int, choices=[1, 2, 3, 4],
                         help="object class number 1~3")
-    parser.add_argument('-c', '--config', default='./configs/annotate.yaml',
+    parser.add_argument('-c', '--config', default='./configs/dvp2.yaml',
                         help="annotate.yaml config file path")
     _args = parser.parse_args()
     return _args

@@ -6,7 +6,6 @@ Convert COCO json file to YOLO txt file
 
 import json
 import os
-import sys
 import argparse
 import yaml
 import shutil
@@ -56,10 +55,10 @@ def main(opt):
     meta_data['nc'] = len(t_label_data['categories'])
     meta_data['names'] = [category['name'] for category in t_label_data['categories']]
 
-    print(yaml.dump(meta_data))
+    print(yaml.dump(meta_data, sort_keys=False))
 
     with open(os.path.join(output_dir, 'data.yaml'), 'w', encoding='utf8') as f:
-        yaml.dump(meta_data, f, allow_unicode=True)
+        yaml.dump(meta_data, f, allow_unicode=True, sort_keys=False)
 
     # Train dataset process
     t_img_num = 0

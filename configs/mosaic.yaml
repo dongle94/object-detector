@@ -7,12 +7,8 @@ DET_MODEL_PATH: './weights/crowdhuman_yolov5m.pt'
 IMG_SIZE: 640
 HALF: false
 OBJ_CLASSES: None
-
-# Object Tracker
-TRACK_USE_ENCODER: true
-TRACK_MODEL_TYPE: "deepocsort"
-TRACK_MODEL_PATH: "./weights/osnet_x0_75_market1501.pt"
-TRACK_HALF: false
+CONF_THRES: 0.3
+NMS_IOU: 0.65
 
 # Logger
 LOG_LEVEL: 'debug'

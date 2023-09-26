@@ -67,8 +67,7 @@ def main(opt):
     for t_anno in t_label_data['annotations']:
         img_id = t_anno["image_id"]
         img_info = [image for image in t_label_data["images"] if image["id"] == img_id][0]
-        img_path = img_info["file_name"]
-
+        img_path = img_info["file_name"].replace("\\", "/")
         orig_img_path = os.path.join(root_dir, img_path)
         full_img_path = os.path.join(output_dir, 'train', 'images', os.path.basename(img_path))
 
@@ -98,7 +97,7 @@ def main(opt):
     for v_anno in v_label_data['annotations']:
         img_id = v_anno["image_id"]
         img_info = [image for image in v_label_data["images"] if image["id"] == img_id][0]
-        img_path = img_info["file_name"]
+        img_path = img_info["file_name"].replace("\\", "/")
 
         orig_img_path = os.path.join(root_dir, img_path)
         full_img_path = os.path.join(output_dir, 'val', 'images', os.path.basename(img_path))

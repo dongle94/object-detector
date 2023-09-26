@@ -5,6 +5,7 @@ import time
 import cv2
 import numpy as np
 from collections import OrderedDict, defaultdict
+from PIL import ImageFont, ImageDraw, Image
 
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QDialog
 from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QTableWidget, QLineEdit, QLabel, QPushButton, QTableWidgetItem,\
@@ -38,61 +39,65 @@ ROW = OrderedDict({"chicken": "닭고기류",
                    "match": "집계물량"})
 PROD = [
     {
-        "name": "수원왕갈비 꾸닭",
-        "chicken": ["태음융융소금염지닭", 50],
-        "sauce1": ["닭갈비간장", 25],
-        "sauce2": ["갈비레이", 25],
-        "powder": ["에어크런치", 50],
+        "name": "제품 1",
+        "chicken": ["닭윙1.3kg", 50],
+        "sauce1": ["닭갈비간장500g", 25],
+        "sauce2": ["볼케이노소스500g", 25],
+        "powder": ["시즈닝100g", 50],
         "quantity": 50,
     },
     {
-        "name": "오리지널 치밥",
-        "chicken": ["후라이드염지닭", 30],
-        "sauce1": ["치밥버무림소스", 15],
-        "sauce2": ["치밥벌크소스", 15],
-        "powder": ["크리스피파우더", 30],
+        "name": "제품 2",
+        "chicken": ["닭볶음용1.3kg", 30],
+        "sauce1": ["허니버터소스1kg", 15],
+        "sauce2": [],
+        "powder": ["시즈닝500g", 30],
         "quantity": 30,
     },
     {
-        "name": "소이퐁 튀닭",
-        "chicken": ["후라이드염지닭", 50],
-        "sauce1": ["소이퐁소스", 50],
+        "name": "제품 3",
+        "chicken": ["닭다리살1kg", 50],
+        "sauce1": ["소떡소떡소스1kg", 50],
         "sauce2": [],
-        "powder": ["우리쌀 후레이크파우더", 50],
+        "powder": ["치킨파우더500g", 50],
         "quantity": 50,
     },
     {
-        "name": "공주매콤 닭갈비",
-        "chicken": ["태음융융소금염지닭", 50],
-        "sauce1": ["닭갈비간장", 50],
+        "name": "제품 4",
+        "chicken": ["닭볶음탕용600g", 50],
+        "sauce1": ["갈릭디핑소스500g", 50],
         "sauce2": [],
-        "powder": [],
+        "powder": ["뿌링클링시즈닝150g", 50],
         "quantity": 50,
     },
     {
-        "name": "크리스피 튀닭",
+        "name": "제품 5",
         "quantity": 50,
-        "chicken": ["핫커리염지닭", 50],
-        "sauce1": ["맛있게매운소스", 25],
-        "sauce2": ["프리마늘소스", 25],
-        "powder": ["크리스피파우더", 50]
+        "chicken": ["훈제오리400g", 50],
+        "sauce1": ["치즈치폴레소스500g", 25],
+        "sauce2": ["닭갈비간장500g", 25],
+        "powder": ["뿌링클링시즈닝150g", 50]
     },
 ]
-
 PROD_CLASS = {
     "태음융융소금염지닭": 0,
-    "후라이드염지닭": 1,
-    "핫커리염지닭": 2,
-    "닭갈비간장": 3,
-    "갈비레이": 4,
-    "치밥버무림소스": 5,
-    "치밥벌크소스": 6,
-    "소이퐁소스": 7,
-    "맛있게매운소스": 8,
-    "프리마늘소스": 9,
-    "에어크런치": 10,
-    "크리스피파우더": 11,
-    "우리쌀 후레이크파우더": 12,
+    "닭윙1.3kg": 1,
+    "시즈닝100g": 2,
+    "시즈닝500g": 3,
+    "닭볶음용1.3kg": 4,
+    "닭다리살1kg": 5,
+    "닭갈비간장500g": 6,
+    "닭볶음탕용600g": 7,
+    "허니버터소스1kg": 8,
+    "소떡소떡소스1kg": 9,
+    "닭갈비고추장500g": 10,
+    "갈릭디핑소스500g": 11,
+    "치즈치폴레소스500g": 12,
+    "훈제오리400g": 13,
+    "오리안심500g": 14,
+    "치킨파우더500g": 15,
+    "볼케이노소스500g": 16,
+    "뿌링클링시즈닝150g": 17,
 }
 
 
@@ -115,6 +120,8 @@ class AnalysisThread(QThread):
     def __init__(self, parent=None, medialoader=None, statusbar=None, detector=None, tracker=None, img_viewer=None,
                  logger=None):
         super().__init__(parent=parent)
+        self.cfg = parent.config
+
         self.medialoader = medialoader if medialoader is not None else self.parent().medialoader
         self.sbar = statusbar if statusbar is not None else self.parent().sbar
         self.detector = detector if detector else self.parent().obj_detector
@@ -149,7 +156,7 @@ class AnalysisThread(QThread):
         # detection filter area set
         f = self.medialoader.wait_frame()
         img_h, img_w = f.shape[:2]
-        filter_ratio = 0.25
+        filter_ratio = 0.1
         filter_x1, filter_y1 = int(img_w * filter_ratio), int(img_h * filter_ratio)
         filter_x2, filter_y2 = int(img_w * (1 - filter_ratio)), int(img_h * (1 - filter_ratio))
 
@@ -206,13 +213,19 @@ class AnalysisThread(QThread):
                 for b in _boxes:
                     if b.tracking_id != -1:
                         cv2.rectangle(frame, (b.x1, b.y1), (b.x2, b.y2), (96, 96, 216), thickness=2, lineType=cv2.LINE_AA)
-                        cv2.putText(frame, f"({b.class_name})ID: {b.tracking_id}", (b.x1, b.y1 + 10),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (216, 96, 96), 2)
+                        font = ImageFont.truetype('./data/fonts/NanumMyeongjoEcoBold.ttf', 20)
+                        img_pil = Image.fromarray(frame)
+                        img_draw = ImageDraw.Draw(img_pil)
+                        img_draw.text((b.x1, b.y1 + 7), f"({b.class_name})ID: {b.tracking_id}", font=font, fill=(216, 96, 96))
+                        # cv2.putText(frame, f"({b.class_name})ID: {b.tracking_id}", (b.x1, b.y1 + 10),
+                        #             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (216, 96, 96), 2)
+                        frame = np.array(img_pil)
 
-                for i, (k, v) in enumerate(self.class_cnt.items()):
-                    cv2.putText(frame, f"{k}({self.detector.names[k]}): {v}", (img_w - 150, 30 + i * 30),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (32, 32, 32), 2)
-
+                # for i, (k, v) in enumerate(self.class_cnt.items()):
+                #     cv2.putText(frame, f"{k}({self.detector.names[k]}): {v}", (img_w - 150, 30 + i * 30),
+                #                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (32, 32, 32), 2)
+                while frame.shape[0] >= 1080:
+                    frame = cv2.resize(frame, (int(frame.shape[0] * 0.8), int(frame.shape[1] * 0.8)))
                 img = QImage(frame.data, frame.shape[1], frame.shape[0], QImage.Format.Format_BGR888)
                 self.viewer.set_image(img)
             t3 = time.time()
@@ -438,7 +451,7 @@ class MainWidget(QWidget):
 
         # Set Input Loader
         try:
-            self.medialoader = MediaLoader(source="0", logger=self.logger, opt=cfg)
+            self.medialoader = MediaLoader(source=cfg.MEDIA_SOURCE, logger=self.logger, opt=cfg)
             self.medialoader.start()
             self.medialoader.pause()
         except Exception as e:

@@ -167,6 +167,13 @@ def main(opt=None):
                         basic_fmt["annotations"].append(_anno_info)
                 else:
                     continue
+            else:
+                basic_fmt["images"].append(img_info)
+                for k, v in c_id.items():
+                    obj_classes[k] += v
+                for _anno_info in tmp_annos:
+                    basic_fmt["annotations"].append(_anno_info)
+
 
             new_path = os.path.join(IMGS_DIR, opt.type, i)
             if not os.path.exists(os.path.dirname(new_path)):

@@ -125,6 +125,7 @@ class AnalysisThread(QThread):
     def __init__(self, parent, input_path=None, detector=None, tracker=None, polygons=[]):
         super().__init__(parent=parent)
         self.logger = get_logger()
+        self.cfg = parent.config
         self.logger.info("Create AnalysisThread.")
 
         self.sbar = self.parent().sbar
@@ -182,56 +183,53 @@ class AnalysisThread(QThread):
             _pred = self.detector.detect(im)
             _pred, _det = self.detector.postprocess(_pred)
 
-            boxes = []
-            # analysis area filtering
-            for _d in _det:
-                x1, y1, x2, y2 = _d[:4]
-                w, h = int(x2-x1), int(y2-y1)
-                bx, by = int(x1 + 0.5 * w), int(y1 + 0.9 * h)
-                bench_point = shapely.Point(bx, by)
-                for polygon in self.polygons:
-                    if polygon.contains(bench_point):
-                        cv2.line(frame, (bx, by), (bx, by),
-                                 (224, 96, 255), 5, cv2.LINE_AA)
-                        boxes.append(_d)
-                        break
-            boxes = np.array(boxes)
             t1 = time.time()
-
             _boxes = []
-            # tracking and creating BBox instance
-            if len(boxes):
-                track_ret = self.tracker.update(boxes, frame)
+            # tracking
+            if len(_det):
+                track_ret = self.tracker.update(_det, frame)
                 if len(track_ret):
-                    t_boxes = track_ret[:, 0:4].astype(np.int32)
-                    t_ids = track_ret[:, 4].astype(np.int32)
-                    t_confs = track_ret[:, 5]
-                    t_classes = track_ret[:, 6]
-                    for xyxy, _id, conf, cls in zip(t_boxes, t_ids, t_confs, t_classes):
-                        if _id != -1:
-                            bbox = BBox(tlbr=xyxy,
-                                        class_index=int(cls),
-                                        class_name=self.detector.names[int(cls)],
-                                        conf=conf,
-                                        imgsz=frame.shape)
-                            bbox.tracking_id = _id
-                            _boxes.append(bbox)
+                    for _t in track_ret:
+                        xyxy = _t[:4]
+                        x1, y1, x2, y2 = _t[:4]
+                        _id = int(_t[4])
+                        conf = _t[5]
+                        cls = _t[6]
 
-                            # 분석결과 처리
-                            if self.id_cnt[_id] == 0:       # 첫 등장
-                                self.t_box_data[_id] = {
-                                    'class_index': int(cls),
-                                    'class_name': self.detector.names[int(cls)],
-                                    'access_time': time.time()
-                                }
-                            elif self.id_cnt[_id] == 10:  # 실제 카운트 인정
-                                if int(_id) not in self.analysis_result.data['checked_id']:
-                                    self.analysis_result.data['object_cnt'][bbox.class_name] += 1
-                                    self.analysis_result.data['checked_id'].append(int(_id))
-                                self.t_box_data[_id]['last_modified_time'] = time.time()
-                            elif self.id_cnt[_id] > 10:
-                                self.t_box_data[_id]['last_modified_time'] = time.time()
-                            self.id_cnt[_id] += 1
+                        w, h = int(x2 - x1), int(y2 - y1)
+                        bx, by = int(x1 + 0.5 * w), int(y1 + 0.9 * h)
+                        bench_point = shapely.Point(bx, by)
+                        for polygon in self.polygons:
+                            if not polygon.contains(bench_point):
+                                continue
+                            elif polygon.contains(bench_point):
+                                cv2.circle(frame, (bx, by), 3, (32, 32, 216), -1)
+
+                                if _id != -1:
+                                    bbox = BBox(tlbr=xyxy,
+                                                class_index=int(cls),
+                                                class_name=self.detector.names[int(cls)],
+                                                conf=conf,
+                                                imgsz=frame.shape)
+                                    bbox.tracking_id = _id
+                                    _boxes.append(bbox)
+
+                                    # 분석결과 처리
+                                    if self.id_cnt[_id] == 0:  # 첫 등장
+                                        self.t_box_data[_id] = {
+                                            'class_index': int(cls),
+                                            'class_name': self.detector.names[int(cls)],
+                                            'access_time': time.time()
+                                        }
+                                    elif self.id_cnt[_id] == self.cfg.REGISTER_FRAME:  # 실제 카운트 인정
+                                        if int(_id) not in self.analysis_result.data['checked_id']:
+                                            self.analysis_result.data['object_cnt'][bbox.class_name] += 1
+                                            self.analysis_result.data['checked_id'].append(int(_id))
+                                        self.t_box_data[_id]['last_modified_time'] = time.time()
+                                    elif self.id_cnt[_id] > self.cfg.REGISTER_FRAME:
+                                        self.t_box_data[_id]['last_modified_time'] = time.time()
+                                    self.id_cnt[_id] += 1
+                                break
 
             del_list = []
             for _id, data in self.t_box_data.items():
@@ -253,12 +251,13 @@ class AnalysisThread(QThread):
             for b in _boxes:
                 x1, y1, x2, y2 = b.x1, b.y1, b.x2, b.y2
                 if b.tracking_id != -1:
+                    b_color = (128, 255, 128)
                     cv2.rectangle(frame, (x1, y1), (x2, y2),
-                                  color=(96, 216, 96),
+                                  color=b_color,
                                   thickness=2, lineType=cv2.LINE_AA)
                     cv2.putText(frame, text=f"({b.class_name})ID: {b.tracking_id}",
                                 org=(b.x1, b.y1+10), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5,
-                                color=(96, 96, 216), thickness=2)
+                                color=(48, 48, 248), thickness=2)
 
             self.viewer.img_label.draw.emit(frame, True)
             t3 = time.time()
@@ -456,14 +455,13 @@ class MainWidget(QWidget):
         path = self.el_source.text()
         try:
             ml = MediaLoader(path, logger=get_logger(), realtime=False)
-            ml.start()
             f = None
             for _ in range(2):
-                f = ml.get_frame()
+                f = ml.get_one_frame()
             if self.set_dialog is None:
                 self.set_dialog = SetAreaDialog(img=f, parent=self)
             self.set_dialog.show()
-            ml.stop()
+            del ml
         except Exception as e:
             self.logger.warning(e)
             MsgDialog(parent=self,

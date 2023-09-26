@@ -4,6 +4,8 @@ from PySide6.QtWidgets import QWidget, QDialog, QLabel, QVBoxLayout
 from PySide6.QtGui import QImage, QPixmap, QPainter, QPolygon, QPen, QColor, QBrush, QPaintEvent
 from PySide6.QtCore import Qt, Signal
 
+from .widget import NormalLabel
+
 
 class ImgDialog(QDialog):
     def __init__(self, parent=None, title="", modality=Qt.WindowModality.NonModal, polygon=False):
@@ -11,7 +13,7 @@ class ImgDialog(QDialog):
 
         # self.img = QImage()
         layout = QVBoxLayout()
-        self.img_label = PolygonOverlayLabel() if polygon is True else QLabel()
+        self.img_label = PolygonOverlayLabel() if polygon is True else NormalLabel()
         self.img_pixmap = QPixmap()
         layout.addWidget(self.img_label)
 
@@ -41,7 +43,7 @@ class ImgWidget(QWidget):
 
         # self.img = QImage()
         layout = QVBoxLayout()
-        self.img_label = PolygonOverlayLabel() if polygon is True else QLabel()
+        self.img_label = PolygonOverlayLabel() if polygon is True else NormalLabel()
         self.img_pixmap = QPixmap()
         layout.addWidget(self.img_label)
 
@@ -63,9 +65,7 @@ class ImgWidget(QWidget):
         self.img_label.setScaledContents(scale)
 
 
-class PolygonOverlayLabel(QLabel):
-    draw = Signal(numpy.ndarray, bool)
-
+class PolygonOverlayLabel(NormalLabel):
     def __init__(self):
         super().__init__()
 
@@ -92,3 +92,29 @@ class PolygonOverlayLabel(QLabel):
 
         # draw
         qp.drawPolygon(polygon)
+
+
+class EllipseLabel(NormalLabel):
+    updateFillColor = Signal(tuple)
+    updateLineColor = Signal(tuple)
+    updateSize = Signal(tuple)
+
+    def __init__(self, size, line_color=(0, 0, 0), fill_color=(128, 128, 128)):
+        super().__init__()
+
+        self.draw_size = size
+        self.line_color = line_color
+        self.fill_color = fill_color
+
+    def paintEvent(self, e):
+        qp = QPainter()
+        qp.begin(self)
+        self.draw_ellipse(qp)
+        qp.end()
+
+    def draw_ellipse(self, qp):
+        qp.setPen(QPen(QColor(*self.line_color), 1))
+        qp.setBrush(QBrush(QColor(*self.fill_color), Qt.SolidPattern))
+        qp.drawEllipse(*self.draw_size)
+
+

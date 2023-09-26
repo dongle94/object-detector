@@ -58,8 +58,8 @@ def main(opt):
 
     print(yaml.dump(meta_data))
 
-    with open(os.path.join(output_dir, 'data.yaml'), 'w') as f:
-        yaml.dump(meta_data, f)
+    with open(os.path.join(output_dir, 'data.yaml'), 'w', encoding='utf8') as f:
+        yaml.dump(meta_data, f, allow_unicode=True)
 
     # Train dataset process
     t_img_num = 0

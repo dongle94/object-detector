@@ -180,7 +180,7 @@ def main(opt=None):
         global img
         img = f1
         while f1.shape[0] >= 1080:
-            f1 = cv2.resize(f1, (int(f1.shape[0] * 0.8), int(f1.shape[1] * 0.8)))
+            f1 = cv2.resize(f1, (int(f1.shape[1] * 0.8), int(f1.shape[0] * 0.8)))
             img = f1
             edit_img_size = (f1.shape[0], f1.shape[1])
 
@@ -203,7 +203,8 @@ def main(opt=None):
                 h = int(orig_pt2[1] - orig_pt1[1])
                 box_point = []
             else:
-                raise Exception("2 points not clicked!")
+                print("2 points not clicked!")
+                break
             anno_info = {
                 "id": anno_ids,
                 "image_id": img_ids,

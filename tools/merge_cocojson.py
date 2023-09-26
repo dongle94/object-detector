@@ -5,7 +5,7 @@ COCO label json file merge tool
 
 import json
 import os
-import sys
+import copy
 import argparse
 
 
@@ -28,7 +28,7 @@ def main(opt):
             basic_fmt = {
                 'info': meta_json['info'],
                 'licenses': meta_json['licenses'],
-                'cattegories': meta_json['categories'],
+                'categories': meta_json['categories'],
                 "images": [],
                 "annotations": []
             }
@@ -38,24 +38,33 @@ def main(opt):
         print("Meta json file not exist")
         return
 
+    imageid_map = {}
     for input_json in inputs_json:
-        imageid_map = {}
         if os.path.exists(input_json):
-            with open(input_json, 'r') as file:
+            print(f"Start {input_json}")
+            with open(input_json, mode='r', encoding='utf8') as file:
                 json_dict = json.load(file)
             for json_img in json_dict['images']:
-                imageid_map[img_ids] = json_img['id']
-                json_img['id'] = img_ids
-                basic_fmt['images'].append(json_img)
+                imageid_map[img_ids] = json_img['file_name']
+                img_json = copy.deepcopy(json_img)
+                img_json['id'] = img_ids
+                basic_fmt['images'].append(img_json)
                 img_ids += 1
 
             for json_anno in json_dict['annotations']:
-                image_id = getKeybyValue(imageid_map, json_anno['image_id'])
+                local_img_id = json_anno['image_id']
+                image_id = 0
+                for json_img in json_dict['images']:
+                    if json_img['id'] == local_img_id:
+                        image_id = getKeybyValue(imageid_map, json_img['file_name'])
+                        break
                 json_anno['id'] = anno_ids
+                json_anno['image_id'] = image_id
                 basic_fmt['annotations'].append(json_anno)
                 anno_ids += 1
 
-    print(basic_fmt)
+            print(f"End {input_json}")
+
     with open(opt.output, 'w') as outfile:
         json.dump(basic_fmt, outfile, indent=2, ensure_ascii=False)
     print("Merge success. stop program.")

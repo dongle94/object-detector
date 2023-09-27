@@ -26,6 +26,7 @@ os.chdir(ROOT)
 from gui.image import ImgWidget, EllipseLabel
 from gui.widget import NormalLabel
 
+from core.bbox import BBox
 from utils.config import _C as cfg, update_config
 from utils.logger import init_logger, get_logger
 from utils.medialoader import MediaLoader
@@ -80,17 +81,29 @@ class AnalysisThread(QThread):
         self.id_cnt = defaultdict(int)
         self.class_cnt = defaultdict(int)
         for v in self.detector.names.values():
-            self.class_cnt[v] = 0
+            if v != 'background':
+                self.class_cnt[v] = 0
 
         self.f_cnt = 0
         self.log_interval = self.parent().config.CONSOLE_LOG_INTERVAL
         self.ts = [0., 0., 0., ]
+
+    def setVideoWriter(self, filename):
+        vw = cv2.VideoWriter(
+            filename=filename,
+            fourcc=cv2.VideoWriter_fourcc(*'mp4v'),
+            fps=self.media_loader.fps,
+            frameSize=(self.media_loader.w, self.media_loader.h),
+            isColor=True
+        )
+        self.vw = vw
 
     def run(self) -> None:
         self.logger.info("Start analysis.")
 
         self.media_loader.start()
         self.ellipse.updateFillColor.emit((216, 32, 32))
+        total_mosaic = 0
         while True:
             frame = self.media_loader.get_frame()
             if frame is None or len(frame.shape) < 2:
@@ -119,6 +132,15 @@ class AnalysisThread(QThread):
                         _id = int(_t[4])
                         conf = _t[5]
                         cls = _t[6]
+
+                        if _id != -1:
+                            bbox = BBox(tlbr=xyxy,
+                                        class_index=int(cls),
+                                        class_name=self.detector.names[int(cls)],
+                                        conf=conf,
+                                        imgsz=frame.shape)
+                            bbox.tracking_id = _id
+                            _boxes.append(bbox)
             t2 = time.time()
 
             for _box in _boxes:
@@ -126,21 +148,22 @@ class AnalysisThread(QThread):
 
                 if self.id_cnt[_box.tracking_id] == self.cfg.REGISTER_FRAME:      # real object count
                     self.class_cnt[_box.class_name] += 1
+                    total_mosaic += 1
 
                     # update
                     _txt = ''
                     for k, v in self.class_cnt.items():
-                        if v != 'background':
+                        if k != 'background':
                             _txt += f"{k:10s} : {v}\n"
                     self.lb_result.updateText.emit(_txt)
 
             for d in _det0:
                 x1, y1, x2, y2 = map(int, d[:4])
-                mosaic(frame, (x1, y1, x2, y2), block=10)
+                mosaic(frame, (x1, y1, x2, y2), block=20)
             for d in _det1:
                 if d[5] == 1:
                     x1, y1, x2, y2 = map(int, d[:4])
-                    mosaic(frame, (x1, y1, x2, y2), block=10)
+                    mosaic(frame, (x1, y1, x2, y2), block=20)
 
             self.viewer.img_label.draw.emit(frame, True)
 
@@ -182,6 +205,8 @@ class AnalysisThread(QThread):
         self.ellipse.updateFillColor.emit((0, 150, 75))
         self.vw.release()
 
+        self.parent().num_mosaic.updateText.emit(str(total_mosaic))
+
         self.logger.info("Analysis Thraed - 영상 분석 종료")
 
 
@@ -208,7 +233,8 @@ class MainWidget(QWidget):
         self.imgWidget_5.img_label.draw.connect(self.draw_img5)
         self.draw_1.updateFillColor.connect(self.change_fill_color)
         self.pbar.valueChanged.connect(self.pbar.setValue)
-        self.num_process.updateText.connect(self.update_text)
+        self.num_process.updateText.connect(self.update_text0)
+        self.num_mosaic.updateText.connect(self.update_text1)
 
         # Analysis
         self.obj_detector = ObjectDetector(cfg=self.config)
@@ -265,7 +291,7 @@ class MainWidget(QWidget):
         self.c_status.addWidget(self.draw_1, 0, Qt.AlignmentFlag.AlignVCenter)
 
         self.c_mosaic = QHBoxLayout()
-        self.num_mosaic = QLabel("0")
+        self.num_mosaic = NormalLabel("0")
         self.c_mosaic.addWidget(QLabel("비 식별처리 건 수 총: "), 45, Qt.AlignmentFlag.AlignRight)
         self.c_mosaic.addWidget(self.num_mosaic, 10, Qt.AlignmentFlag.AlignCenter)
         self.c_mosaic.addWidget(QLabel("건"), 45, Qt.AlignmentFlag.AlignLeft)
@@ -312,11 +338,13 @@ class MainWidget(QWidget):
 
     @Slot()
     def find_video(self):
-        f_name, _ = QFileDialog.getOpenFileName(parent=self, caption="비디오 파일 선택",
-                                             filter="All Files(*);;"
-                                                    "Videos(*.webm);;"
-                                                    "Videos(*.mp4 *.avi *m4v *.mpg *.mpeg);;"
-                                                    "Videos(*.wmv *.mov *.mkv *.flv)")
+        f_name, _ = QFileDialog.getOpenFileName(
+            parent=self,
+            caption="비디오 파일 선택",
+            filter="All Files(*);;"
+                   "Videos(*.webm);;"
+                   "Videos(*.mp4 *.avi *m4v *.mpg *.mpeg);;"
+                   "Videos(*.wmv *.mov *.mkv *.flv)")
         self.logger.info(f"Find Video - {f_name}")
         if f_name != "":
             if self.analysis_thread is not None:
@@ -358,13 +386,7 @@ class MainWidget(QWidget):
         if f_name != "":
             filename = f_name + '.mp4' if os.path.splitext(f_name)[1] not in ['.mp4', '.webm', '.avi'] else f_name
             self.logger.info(f"Save Video - {filename}")
-            self.analysis_thread.vw = cv2.VideoWriter(
-                filename=filename,
-                fourcc=cv2.VideoWriter_fourcc(*'mp4v'),
-                fps=self.analysis_thread.media_loader.fps,
-                frameSize=(self.analysis_thread.media_loader.w, self.analysis_thread.media_loader.h),
-                isColor=True
-            )
+            self.analysis_thread.setVideoWriter(filename)
 
             self.analysis_thread.start()
 
@@ -402,9 +424,12 @@ class MainWidget(QWidget):
         self.draw_1.update()
 
     @Slot()
-    def update_text(self, txt):
+    def update_text0(self, txt):
         self.num_process.setText(txt)
 
+    @Slot()
+    def update_text1(self, txt):
+        self.num_mosaic.setText(txt)
 
 class P2(QMainWindow):
     def __init__(self, config=None):

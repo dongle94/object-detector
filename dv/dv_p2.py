@@ -476,7 +476,7 @@ if __name__ == "__main__":
     init_logger(cfg=cfg)
 
     app_gui = P2(cfg)
-    app_gui.setWindowTitle("P2")
+    app_gui.setWindowTitle("원더풀")
     app_gui.show()
 
     sys.exit(app.exec())

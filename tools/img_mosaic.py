@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+"""
+Image mosaic process
+- dlib face detection
+- yolo face object detection
+"""
+
 import os
 import sys
 import cv2
@@ -24,7 +31,6 @@ from core.obj_detectors import ObjectDetector
 
 
 def mosaic(img: np.ndarray, coord, block=10):
-
     x1, y1, x2, y2 = coord
     w, h = x2 - x1+1, y2 - y1+1
     if w < block:
@@ -44,6 +50,7 @@ def process_mosaic(opt):
     inps = opt.inputs
     save_dir = opt.save_path
     is_show = opt.show
+    mosaic_size = opt.mosaic_size
 
     update_config(cfg, args='./configs/mosaic.yaml')
     init_logger(cfg)
@@ -52,14 +59,14 @@ def process_mosaic(opt):
     detector = ObjectDetector(cfg=cfg)
     face_detector = dlib.cnn_face_detection_model_v1('./weights/mmod_human_face_detector.dat')
 
-    # 디렉토리 읽기
+    # Read dirs
     is_file, is_dir = os.path.isfile(inps), os.path.isdir(inps)
     logger.info(f"{is_file=}, {is_dir=}")
     if save_dir and not os.path.exists(save_dir):
-        logger.info(f"make dir {save_dir}")
+        logger.info(f"Make save dir: {save_dir}")
         os.makedirs(save_dir)
 
-    # 이미지 리스트 가공
+    # Preprocess image list
     if is_file and isinstance(inps, str):
         inps = [os.path.abspath(inps)]
     elif is_dir:
@@ -71,101 +78,105 @@ def process_mosaic(opt):
         logger.info("There is no image files")
         return
 
-    # 이미지 loop start
+    # Image process loop Start
     f_cnt = 0
     st = time.time()
     for inp in tqdm(inps, "Processing image mosaic"):
-        img = cv2.imread(inp)
+        f0 = cv2.imread(inp, cv2.IMREAD_COLOR)
 
-        if len(img.shape) == 2:
-            img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+        if len(f0.shape) == 2:
+            f0 = cv2.cvtColor(f0, cv2.COLOR_GRAY2RGB)
 
-        im = detector.preprocess(img)
+        # Detect faces & people by yolo
+        im = detector.preprocess(f0)
         _pred = detector.detect(im)
         _pred, _det = detector.postprocess(_pred)
 
-        orig_img = img.copy()
+        f1 = f0.copy()
 
-        # whole image 1st process
+        # Detect faces by dlib
         upsample = 0
-        if img.shape[0] * img.shape[1] < 640 * 480:
+        if f0.shape[0] * f0.shape[1] < 640 * 360:
             upsample = 2
-        elif img.shape[0] * img.shape[1] < 1280 * 720:
+        elif f0.shape[0] * f0.shape[1] < 1280 * 720:
             upsample = 1
-        whole_det = face_detector(img, upsample)
+        whole_det = face_detector(f0, upsample)
 
-        # human boxes 2nd process
+        # People boxes 2nd detect faces by dlib
         for d in _det:
-            # threshold filtering
-            if d[4] < 0.3:
-                continue
-            if d[5] == 0:
+            # class == Person
+            if int(d[5]) == 0:
                 x1, y1, x2, y2 = map(int, d[:4])
-                w, h = x2-x1, y2-y1
 
-                face_img = img[y1:y2, x1:x2]
-                # 사람객체 별 얼굴인식 시도 후 모자이크 처리
+                face_img = f0[y1:y2, x1:x2]
+                # Process mosaic after detecting face each person
                 upsample = 0
                 if face_img.shape[0] * face_img.shape[1] < 100 * 60:
-                    upsample = 5
-                if face_img.shape[0] * face_img.shape[1] < 320 * 180:
                     upsample = 4
-                elif face_img.shape[0] * face_img.shape[1] < 640 * 360:
+                elif face_img.shape[0] * face_img.shape[1] < 320 * 180:
                     upsample = 3
-                elif face_img.shape[0] * face_img.shape[1] < 1280 * 720:
+                elif face_img.shape[0] * face_img.shape[1] < 640 * 360:
                     upsample = 2
+                elif face_img.shape[0] * face_img.shape[1] < 1280 * 720:
+                    upsample = 1
                 face_det = face_detector(face_img, upsample)
                 for fd in face_det:
                     d = fd.rect
                     fx1, fy1, fx2, fy2 = d.left(), d.top(), d.right(), d.bottom()
-                    mosaic(img, (x1+fx1, y1+fy1, x1+fx2, y1+fy2), block=5)
-            elif d[5] == 1:
-                # 머리 박스 모자이크 처리
+                    mosaic(f0, (x1+fx1, y1+fy1, x1+fx2, y1+fy2), block=mosaic_size)
+            # class == Head
+            elif int(d[5]) == 1:
+                # Process mosaic head box
                 x1, y1, x2, y2 = map(int, d[:4])
-                mosaic(img, (x1, y1, x2, y2), block=5)
+                if is_show:
+                    cv2.rectangle(f1, (x1, y1), (x2, y2), (96, 96, 216), thickness=2,
+                                  lineType=cv2.LINE_AA)
+                mosaic(f0, (x1, y1, x2, y2), block=mosaic_size)
 
-        # 전체 이미지에 대해서 인식되는 얼굴 모자이크 처리
+        # Process mosaic by detecting faces in dlib
         for wd in whole_det:
             wd = wd.rect
             wx1, wy1, wx2, wy2 = wd.left(), wd.top(), wd.right(), wd.bottom()
             if is_show:
-                cv2.rectangle(orig_img, (wx1, wy1), (wx2, wy2), (96, 96, 216), thickness=2,
+                cv2.rectangle(f1, (wx1, wy1), (wx2, wy2), (96, 96, 216), thickness=2,
                               lineType=cv2.LINE_AA)
-            mosaic(img, (wx1, wy1, wx2, wy2), block=5)
-
-        # 시간 부분 마스킹
-        # mosaic(img, (1450, 50, 1850, 100), block=10)
-        #cv2.rectangle(img, (1450, 50), (1850, 90), (216, 216, 216), -1)
-
+            mosaic(f0, (wx1, wy1, wx2, wy2), block=5)
 
         # 그려서 보여주기
         if is_show:
-            if orig_img.shape[1] * orig_img.shape[0] > 1280 * 720:
-                orig_img = cv2.resize(orig_img, (int(orig_img.shape[1]/2), int(orig_img.shape[0]/2)))
-            if img.shape[1] * img.shape[0] > 1280 * 720:
-                img = cv2.resize(img, (int(img.shape[1] / 2), int(img.shape[0] / 2)))
-            cv2.imshow("orig", orig_img)
-            cv2.imshow("_", img)
-            if cv2.waitKey(0) == ord("q"):
+            if f1.shape[0] >= 1080:
+                f1 = cv2.resize(f1, (int(f1.shape[1] * 0.8), int(f1.shape[0] * 0.8)))
+            if f0.shape[0] >= 1080:
+                f0 = cv2.resize(f0, (int(f0.shape[1] * 0.8), int(f0.shape[0] * 0.8)))
+            cv2.imshow("orig", f1)
+            cv2.imshow("_", f0)
+            k = cv2.waitKey(0)
+            if k == ord("q"):
                 return
+            elif k == ord('y'):
+                is_show = False
         f_cnt += 1
         if save_dir:
-            cv2.imwrite(os.path.join(save_dir, os.path.basename(inp)), img)
+            cv2.imwrite(os.path.join(save_dir, os.path.basename(inp)), f0)
     et = time.time()
     if f_cnt:
         logger.info(f"{f_cnt} images spend {et - st:.4f} sec.")
 
 
 def args_parse():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="if --show, you can click 'y' to image invisible. "
+                                                 "Mosaic size is 10 by default.")
     parser.add_argument('-i', '--inputs', required=True,
                         help='image file or directory path')
     parser.add_argument('-s', '--save_path', default="")
     parser.add_argument('--show', action='store_true')
+    parser.add_argument('-m', '--mosaic_size', type=int, default=10,
+                        help='mosaic block size')
     _args = parser.parse_args()
     return _args
 
 
 if __name__ == "__main__":
+
     args = args_parse()
     process_mosaic(args)

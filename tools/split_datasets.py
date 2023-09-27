@@ -1,22 +1,20 @@
+# -*- coding: utf-8 -*-
+"""
+Split dataset train / val directory
+"""
+
 import os
-import sys
 import argparse
 import shutil
 from tqdm import tqdm
-
 from pathlib import Path
-FILE = Path(__file__).resolve()
-ROOT = FILE.parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.append(str(ROOT))
-os.chdir(ROOT)
+
 
 def run(opt):
     image_dirs = opt.image_dir
-    print(image_dirs)
+    print(f"Process dirs: {image_dirs}")
     for image_dir in image_dirs:
         # extract list for only images.
-        # os.path.splitext(i)[1] == pathlib.Path(i).suffix
         imgs = [i for i in os.listdir(image_dir) if Path(i).suffix.lower() in ['.jpg', '.png', '.jpeg', '.bmp']]
         if opt.shuffle is False:
             imgs.sort()

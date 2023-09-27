@@ -434,6 +434,7 @@ class MainWidget(QWidget):
     def update_text1(self, txt):
         self.num_mosaic.setText(txt)
 
+
 class P2(QMainWindow):
     def __init__(self, config=None):
         super().__init__()

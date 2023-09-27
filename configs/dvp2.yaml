@@ -7,7 +7,7 @@ DET_MODEL_PATH: './weights/p2_x6.pt'
 IMG_SIZE: 1280
 HALF: false
 OBJ_CLASSES: None   # None or [0, 1, 2...]
-CONF_THRES: 0.5
+CONF_THRES: 0.3
 NMS_IOU: 0.65
 
 # Object Tracker

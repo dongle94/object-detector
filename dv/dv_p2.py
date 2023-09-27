@@ -15,6 +15,7 @@ from collections import defaultdict
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget
 from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QFileDialog, QProgressBar
 from PySide6.QtCore import Qt, Slot, Signal, QThread
+from PySide6.QtGui import QFont
 
 from pathlib import Path
 FILE = Path(__file__).resolve()
@@ -24,11 +25,14 @@ if str(ROOT) not in sys.path:
 os.chdir(ROOT)
 
 from gui.image import ImgWidget, EllipseLabel
+from gui.widget import NormalLabel
 
+from core.bbox import BBox
 from utils.config import _C as cfg, update_config
 from utils.logger import init_logger, get_logger
 from utils.medialoader import MediaLoader
 from core.obj_detectors import ObjectDetector
+from core.tracking import ObjectTracker
 
 
 def mosaic(img: np.ndarray, coord, block=10):
@@ -48,7 +52,7 @@ def mosaic(img: np.ndarray, coord, block=10):
 
 
 class AnalysisThread(QThread):
-    def __init__(self, parent, input_path=None, detector=None, head_detector=None, img_viewer=None):
+    def __init__(self, parent, input_path=None, detector=None, head_detector=None, tracker=None, img_viewer=None):
         super().__init__(parent=parent)
         self.logger = get_logger()
         self.cfg = parent.config
@@ -72,41 +76,115 @@ class AnalysisThread(QThread):
         # analysis module
         self.detector = detector
         self.head_detector = head_detector
+        self.tracker = tracker
 
         # analysis logging
+        self.id_cnt = defaultdict(int)
         self.class_cnt = defaultdict(int)
-        # for v in self.detector.names.values():
-        #     self.class_cnt[v] = 0
+        for v in self.detector.names.values():
+            if v != 'background':
+                self.class_cnt[v] = 0
 
         self.f_cnt = 0
         self.log_interval = self.parent().config.CONSOLE_LOG_INTERVAL
+        self.ts = [0., 0., 0., ]
+
+    def setVideoWriter(self, filename):
+        vw = cv2.VideoWriter(
+            filename=filename,
+            fourcc=cv2.VideoWriter_fourcc(*'mp4v'),
+            fps=self.media_loader.fps,
+            frameSize=(self.media_loader.w, self.media_loader.h),
+            isColor=True
+        )
+        self.vw = vw
 
     def run(self) -> None:
         self.logger.info("Start analysis.")
 
         self.media_loader.start()
         self.ellipse.updateFillColor.emit((216, 32, 32))
+        total_mosaic = 0
         while True:
             frame = self.media_loader.get_frame()
             if frame is None or len(frame.shape) < 2:
                 break
+
+            # Detection
+            t0 = time.time()
+
+            im = self.detector.preprocess(frame)
+            _pred = self.detector.detect(im)
+            _pred0, _det0 = self.detector.postprocess(_pred)
+
             im = self.head_detector.preprocess(frame)
             _pred = self.head_detector.detect(im)
-            _pred, _det = self.head_detector.postprocess(_pred)
+            _pred1, _det1 = self.head_detector.postprocess(_pred)
 
-            for d in _det:
+            t1 = time.time()
+
+            # Tracking
+            _boxes = []
+            if len(_det0):
+                track_ret = self.tracker.update(_det0, frame)
+                if len(track_ret):
+                    for _t in track_ret:
+                        xyxy = _t[:4]
+                        _id = int(_t[4])
+                        conf = _t[5]
+                        cls = _t[6]
+
+                        if _id != -1:
+                            bbox = BBox(tlbr=xyxy,
+                                        class_index=int(cls),
+                                        class_name=self.detector.names[int(cls)],
+                                        conf=conf,
+                                        imgsz=frame.shape)
+                            bbox.tracking_id = _id
+                            _boxes.append(bbox)
+            t2 = time.time()
+
+            for _box in _boxes:
+                self.id_cnt[_box.tracking_id] += 1      # register count
+
+                if self.id_cnt[_box.tracking_id] == self.cfg.REGISTER_FRAME:      # real object count
+                    self.class_cnt[_box.class_name] += 1
+                    total_mosaic += 1
+
+                    # update
+                    _txt = ''
+                    for k, v in self.class_cnt.items():
+                        if k != 'background':
+                            _txt += f"{k:15s} : {v}\n"
+                    self.lb_result.updateText.emit(_txt)
+
+            for d in _det0:
+                x1, y1, x2, y2 = map(int, d[:4])
+                mosaic(frame, (x1, y1, x2, y2), block=20)
+            for d in _det1:
                 if d[5] == 1:
                     x1, y1, x2, y2 = map(int, d[:4])
-                    mosaic(frame, (x1, y1, x2, y2), block=10)
+                    mosaic(frame, (x1, y1, x2, y2), block=20)
 
             self.viewer.img_label.draw.emit(frame, True)
 
             self.vw.write(frame)
 
+            t3 = time.time()
+
+            # calculate time
+            self.ts[0] += (t1 - t0)
+            self.ts[1] += (t2 - t1)
+            self.ts[2] += (t3 - t2)
+
             # logging
             self.f_cnt += 1
             if self.f_cnt % self.log_interval == 0:
-                self.logger.info(f"[{self.f_cnt} Frame]")
+                self.logger.info(
+                    f"[{self.f_cnt} Frame] det: {self.ts[0] / self.f_cnt:.4f} / "
+                    f"tracking: {self.ts[1] / self.f_cnt:.4f} / "
+                    f"visualize and writing: {self.ts[2] / self.f_cnt:.4f}"
+                )
 
             # Process Event
             if int(self.num_frames * 1 / 7) == self.f_cnt:
@@ -127,6 +205,8 @@ class AnalysisThread(QThread):
         # End Process
         self.ellipse.updateFillColor.emit((0, 150, 75))
         self.vw.release()
+
+        self.parent().num_mosaic.updateText.emit(str(total_mosaic))
 
         self.logger.info("Analysis Thraed - 영상 분석 종료")
 
@@ -154,15 +234,25 @@ class MainWidget(QWidget):
         self.imgWidget_5.img_label.draw.connect(self.draw_img5)
         self.draw_1.updateFillColor.connect(self.change_fill_color)
         self.pbar.valueChanged.connect(self.pbar.setValue)
+        self.num_process.updateText.connect(self.update_text0)
+        self.num_mosaic.updateText.connect(self.update_text1)
 
         # Analysis
-        self.obj_detector = None
-        # self.obj_detector = ObjectDetector(cfg=self.config)
+        self.obj_detector = ObjectDetector(cfg=self.config)
         self.config.defrost()
         self.config.DET_MODEL_PATH = './weights/crowdhuman_yolov5m.pt'
+        self.config.IMG_SIZE = 640
         self.config.freeze()
         self.head_detector = ObjectDetector(cfg=self.config)
+        self.obj_tracker = ObjectTracker(cfg=self.config)
         self.analysis_thread = None
+
+        # post update
+        txt = ''
+        for v in self.obj_detector.names.values():
+            if v != 'background':
+                txt += f"{v:15s} : 0\n"
+        self.num_process.setText(txt)
 
     def setupUi(self):
         self.frame_width = self.parent().size().width()
@@ -202,10 +292,11 @@ class MainWidget(QWidget):
         self.c_status.addWidget(self.draw_1, 0, Qt.AlignmentFlag.AlignVCenter)
 
         self.c_mosaic = QHBoxLayout()
-        self.num_mosaic = QLabel("0")
-        self.c_mosaic.addWidget(QLabel("비 식별처리 건 수 총: "), 45, Qt.AlignmentFlag.AlignRight)
+        self.num_mosaic = NormalLabel("0")
+        self.c_mosaic.addWidget(QLabel("비 식별처리 건 수 총: "), 55, Qt.AlignmentFlag.AlignRight)
         self.c_mosaic.addWidget(self.num_mosaic, 10, Qt.AlignmentFlag.AlignCenter)
-        self.c_mosaic.addWidget(QLabel("건"), 45, Qt.AlignmentFlag.AlignLeft)
+        self.c_mosaic.addWidget(QLabel("건"), 35, Qt.AlignmentFlag.AlignLeft)
+        self.c_mosaic.setAlignment(Qt.AlignmentFlag.AlignHCenter)
 
         self.c_imgWidget = ImgWidget()
         self.c_imgWidget.setFixedSize(int(self.frame_width * 0.25), int(self.frame_height * 0.25))
@@ -214,7 +305,8 @@ class MainWidget(QWidget):
         self.pbar.setFixedSize(int(self.frame_width * 0.25), int(self.frame_height * 0.02))
 
         self.c_result = QVBoxLayout()
-        self.num_process = QLabel("")
+        self.num_process = NormalLabel("")
+        self.num_process.setFont(QFont('Consolas', 13))
         self.c_result.addWidget(QLabel("[상세 내용]"), 10, alignment=Qt.AlignmentFlag.AlignCenter)
         self.c_result.addWidget(self.num_process, 90, alignment=Qt.AlignmentFlag.AlignHCenter)
 
@@ -229,7 +321,7 @@ class MainWidget(QWidget):
         self.layer_0.addLayout(self.layer_0_middle, 40)
         self.layer_0.addLayout(self.layer_0_right, 30)
 
-        self.widget_0.setStyleSheet("border: 1px solid black;")
+        # self.widget_0.setStyleSheet("border: 1px solid black;")
         # self.widget_0.setStyleSheet("background-image: ./data/images/army.png")
 
         # layout 1
@@ -249,11 +341,13 @@ class MainWidget(QWidget):
 
     @Slot()
     def find_video(self):
-        f_name, _ = QFileDialog.getOpenFileName(parent=self, caption="비디오 파일 선택",
-                                             filter="All Files(*);;"
-                                                    "Videos(*.webm);;"
-                                                    "Videos(*.mp4 *.avi *m4v *.mpg *.mpeg);;"
-                                                    "Videos(*.wmv *.mov *.mkv *.flv)")
+        f_name, _ = QFileDialog.getOpenFileName(
+            parent=self,
+            caption="비디오 파일 선택",
+            filter="All Files(*);;"
+                   "Videos(*.webm);;"
+                   "Videos(*.mp4 *.avi *m4v *.mpg *.mpeg);;"
+                   "Videos(*.wmv *.mov *.mkv *.flv)")
         self.logger.info(f"Find Video - {f_name}")
         if f_name != "":
             if self.analysis_thread is not None:
@@ -278,6 +372,7 @@ class MainWidget(QWidget):
                     input_path=f_name,
                     detector=self.obj_detector,
                     head_detector=self.head_detector,
+                    tracker=self.obj_tracker,
                     img_viewer=self.c_imgWidget
                 )
 
@@ -287,19 +382,14 @@ class MainWidget(QWidget):
     def process(self):
         self.logger.info("Click - bt_process button.")
 
-        f_name, _ = QFileDialog.getSaveFileName(parent=self, caption="비디오 파일 저장",
-                                             dir=os.getenv("HOME"),
-                                             filter="Videos(*.mp4);;")
+        f_name, _ = QFileDialog.getSaveFileName(
+            parent=self, caption="비디오 파일 저장",
+            dir=os.getenv("HOME"),
+            filter="Videos(*.mp4);;")
         if f_name != "":
             filename = f_name + '.mp4' if os.path.splitext(f_name)[1] not in ['.mp4', '.webm', '.avi'] else f_name
             self.logger.info(f"Save Video - {filename}")
-            self.analysis_thread.vw = cv2.VideoWriter(
-                filename=filename,
-                fourcc=cv2.VideoWriter_fourcc(*'mp4v'),
-                fps=self.analysis_thread.media_loader.fps,
-                frameSize=(self.analysis_thread.media_loader.w, self.analysis_thread.media_loader.h),
-                isColor=True
-            )
+            self.analysis_thread.setVideoWriter(filename)
 
             self.analysis_thread.start()
 
@@ -336,6 +426,13 @@ class MainWidget(QWidget):
         self.draw_1.fill_color = color
         self.draw_1.update()
 
+    @Slot()
+    def update_text0(self, txt):
+        self.num_process.setText(txt)
+
+    @Slot()
+    def update_text1(self, txt):
+        self.num_mosaic.setText(txt)
 
 class P2(QMainWindow):
     def __init__(self, config=None):
@@ -379,7 +476,7 @@ if __name__ == "__main__":
     init_logger(cfg=cfg)
 
     app_gui = P2(cfg)
-    app_gui.setWindowTitle("P2")
+    app_gui.setWindowTitle("원더풀")
     app_gui.show()
 
     sys.exit(app.exec())

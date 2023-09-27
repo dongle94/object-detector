@@ -15,6 +15,7 @@ from collections import defaultdict
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget
 from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QFileDialog, QProgressBar
 from PySide6.QtCore import Qt, Slot, Signal, QThread
+from PySide6.QtGui import QFont
 
 from pathlib import Path
 FILE = Path(__file__).resolve()
@@ -154,7 +155,7 @@ class AnalysisThread(QThread):
                     _txt = ''
                     for k, v in self.class_cnt.items():
                         if k != 'background':
-                            _txt += f"{k:10s} : {v}\n"
+                            _txt += f"{k:15s} : {v}\n"
                     self.lb_result.updateText.emit(_txt)
 
             for d in _det0:
@@ -250,7 +251,7 @@ class MainWidget(QWidget):
         txt = ''
         for v in self.obj_detector.names.values():
             if v != 'background':
-                txt += f"{v:10s} : 0\n"
+                txt += f"{v:15s} : 0\n"
         self.num_process.setText(txt)
 
     def setupUi(self):
@@ -292,9 +293,10 @@ class MainWidget(QWidget):
 
         self.c_mosaic = QHBoxLayout()
         self.num_mosaic = NormalLabel("0")
-        self.c_mosaic.addWidget(QLabel("비 식별처리 건 수 총: "), 45, Qt.AlignmentFlag.AlignRight)
+        self.c_mosaic.addWidget(QLabel("비 식별처리 건 수 총: "), 55, Qt.AlignmentFlag.AlignRight)
         self.c_mosaic.addWidget(self.num_mosaic, 10, Qt.AlignmentFlag.AlignCenter)
-        self.c_mosaic.addWidget(QLabel("건"), 45, Qt.AlignmentFlag.AlignLeft)
+        self.c_mosaic.addWidget(QLabel("건"), 35, Qt.AlignmentFlag.AlignLeft)
+        self.c_mosaic.setAlignment(Qt.AlignmentFlag.AlignHCenter)
 
         self.c_imgWidget = ImgWidget()
         self.c_imgWidget.setFixedSize(int(self.frame_width * 0.25), int(self.frame_height * 0.25))
@@ -304,6 +306,7 @@ class MainWidget(QWidget):
 
         self.c_result = QVBoxLayout()
         self.num_process = NormalLabel("")
+        self.num_process.setFont(QFont('Consolas', 13))
         self.c_result.addWidget(QLabel("[상세 내용]"), 10, alignment=Qt.AlignmentFlag.AlignCenter)
         self.c_result.addWidget(self.num_process, 90, alignment=Qt.AlignmentFlag.AlignHCenter)
 
@@ -318,7 +321,7 @@ class MainWidget(QWidget):
         self.layer_0.addLayout(self.layer_0_middle, 40)
         self.layer_0.addLayout(self.layer_0_right, 30)
 
-        self.widget_0.setStyleSheet("border: 1px solid black;")
+        # self.widget_0.setStyleSheet("border: 1px solid black;")
         # self.widget_0.setStyleSheet("background-image: ./data/images/army.png")
 
         # layout 1

@@ -63,6 +63,7 @@ class MediaLoader(object):
         n, f = 0, self.frame
         while cap.isOpened() and n < f and self.alive:
             # pause action
+            t1 = time.time()
             if self.bpause is True:
                 time.sleep(0.001)
                 continue
@@ -80,7 +81,9 @@ class MediaLoader(object):
                 else:
                     self.img = np.zeros_like(self.img)
                     cap.open(stream)
-            time.sleep(wait_ms)
+            t2 = time.time()
+            if wait_ms - (t2 - t1) > 0:
+                time.sleep(wait_ms - (t2 - t1))
         # break loop
         self.img = None
 

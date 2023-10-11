@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-datavoucher P1 - 와이 이노베이션
+datavoucher P1 - 와이이노베이션랩 - 쓰리알 솔루션
 Industrial Garbage detection demo
 """
 
@@ -75,6 +75,7 @@ class AnalysisThread(QThread):
         fps = self.media_loader.fps
         w_time = 1 / fps
 
+        _result_txt = ""
         while True:
             frame = self.media_loader.get_frame()
             if frame is None or self.stop_run is True:
@@ -127,6 +128,7 @@ class AnalysisThread(QThread):
                     for k, v in self.class_cnt.items():
                         _txt += f"{k:10s} : {v}\n"
                     self.lb_result.updateText.emit(_txt)
+                    _result_txt = _txt
 
             # visualize
             for b in _boxes:
@@ -148,10 +150,10 @@ class AnalysisThread(QThread):
                     f"tracking: {self.ts[1] / self.f_cnt:.4f} / "
                     f"visualize: {self.ts[2] / self.f_cnt:.4f}")
 
-            if (t2 - t0) + 0.001 < w_time:
-                s_time = w_time - (t2 - t0) - 0.001
+            if w_time - (t2 - t0) > 0:
+                s_time = w_time - (t2 - t0) + 0.001
                 time.sleep(s_time)
-
+        self.logger.info(f"분석결과: {_result_txt}")
         self.logger.info("Analysis Thraed - 영상 분석 종료")
 
 
@@ -243,8 +245,15 @@ class MainWidget(QWidget):
                                                     "Videos(*.mp4 *.avi *m4v *.mpg *mpeg);;"
                                                     "Videos(*.wmv *.mov *.mkv *.flv)")
         self.logger.info(f"Find Video - {f_name}")
-
+        if self.analysis_thread is not None:
+            self.analysis_thread = None
         if self.analysis_thread is None:
+            ml = MediaLoader(f_name[0], logger=get_logger(), realtime=False)
+            f = None
+            for _ in range(2):
+                f = ml.get_one_frame()
+            del ml
+            self.img_view.set_array(f, True)
             self.analysis_thread = AnalysisThread(
                 parent=self,
                 input_path=f_name[0],
@@ -260,6 +269,7 @@ class MainWidget(QWidget):
         self.logger.info("Click - bt_start button.")
 
         self.analysis_thread.start()
+        self.bt_find_video.setDisabled(True)
 
     @Slot()
     def stop_analysis(self):
@@ -267,6 +277,7 @@ class MainWidget(QWidget):
 
         self.analysis_thread.stop_run = True
         self.analysis_thread.exit()
+        self.bt_find_video.setDisabled(False)
 
     @Slot()
     def draw_img(self, img, scale=False):
@@ -324,7 +335,7 @@ if __name__ == "__main__":
     init_logger(cfg=cfg)
 
     app_gui = P1(cfg)
-    app_gui.setWindowTitle("P1")
+    app_gui.setWindowTitle("쓰리알솔루션")
     app_gui.show()
 
     sys.exit(app.exec())

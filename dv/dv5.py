@@ -48,7 +48,7 @@ class ResultDialog(QDialog):
 
         self.tabs = QTabWidget()
 
-        result_files = sorted(glob.glob(pathname='./log/*.result'), key=os.path.getmtime, reverse=True)
+        result_files = sorted(glob.glob(pathname=f'./log/{self.parent().config.LOGGER_NAME}*.result'), key=os.path.getmtime, reverse=True)
         result_files = [os.path.abspath(f) for f in result_files]
         for result_file in result_files:
             f_name = os.path.splitext(os.path.basename(result_file))[0]
@@ -74,7 +74,7 @@ class ResultDialog(QDialog):
                         rc += 1
                 elif k == 'tts':
                     for cls, total_t in v.items():
-                        cnt = int(data['object_cnt'][cls])
+                        cnt = int(data['object_cnt'][cls]) if cls in data['object_cnt'] else 1
                         avg_t = total_t / cnt
                         tb.setItem(rc, 0, QTableWidgetItem(f"Stay Time - {cls}(sec)"))
                         tb.setItem(rc, 1, QTableWidgetItem(f"{avg_t:.3f}"))
@@ -95,9 +95,10 @@ class ResultDialog(QDialog):
 
 
 class AnalysisResult(object):
-    def __init__(self, source):
+    def __init__(self, source, name):
         self.data = {}
         self.source = source
+        self.name = name
 
     def init_analysis(self):
         get_logger().info("AnalysisResult initialization.")
@@ -112,7 +113,7 @@ class AnalysisResult(object):
 
     def stop_analysis(self):
         # 분석 종료 버튼을 누르고 -> 분석 쓰레드 관련된 부분 정리 후 -> 분석 결과에 대한 처리
-        file_name = f'{self.data["end_time"]}.result'
+        file_name = f'{self.name}_{self.data["end_time"]}.result'
         file_name = os.path.abspath(os.path.join('./log', file_name))
         if not os.path.exists(os.path.dirname(file_name)):
             os.makedirs(os.path.dirname(file_name))
@@ -145,7 +146,7 @@ class AnalysisThread(QThread):
         self.tracker = tracker
 
         self.viewer = self.parent().layer_1
-        self.analysis_result = AnalysisResult(input_path)
+        self.analysis_result = AnalysisResult(input_path, self.cfg.LOGGER_NAME)
         self.stop_run = False
 
         self.id_cnt = defaultdict(int)
@@ -175,8 +176,8 @@ class AnalysisThread(QThread):
             if frame is None or self.stop_run is True:
                 break
 
-            if frame.shape[0] >= 1080:
-                frame = cv2.resize(frame, (int(frame.shape[1]*0.8), int(frame.shape[0]*0.8)))
+            while frame.shape[0] >= 1080:
+                frame = cv2.resize(frame, (int(frame.shape[1] * 0.5), int(frame.shape[0] * 0.5)))
 
             t0 = time.time()
             im = self.detector.preprocess(frame)
@@ -305,8 +306,8 @@ class SetAreaDialog(QDialog):
 
         label = QLabel("3개 이상의 점을 찍어 영역을 설정해 주세요.")
         self.frame = img
-        if img.shape[0] >= 1080:
-            img = cv2.resize(img, (int(img.shape[1] * 0.8), int(img.shape[0] * 0.8)))
+        while img.shape[0] >= 1080:
+            img = cv2.resize(img, (int(img.shape[1] * 0.5), int(img.shape[0] * 0.5)))
         self.img_size = img.shape
         self.img = ImgWidget(parent=self, polygon=True)
         self.img.set_array(img) #, scale=True)
@@ -432,7 +433,8 @@ class MainWidget(QWidget):
                                              filter="All Files(*);;"
                                                     "Videos(*.webm);;"
                                                     "Videos(*.mp4 *.avi *m4v *.mpg *mpeg);;"
-                                                    "Videos(*.wmv *.mov *.mkv *.flv)")
+                                                    "Videos(*.wmv *.mov *.mkv *.flv)",
+                                             options=QFileDialog.DontUseNativeDialog)
         self.el_source.setText(f_name[0])
         self.bt_set_area.setDisabled(False)
 

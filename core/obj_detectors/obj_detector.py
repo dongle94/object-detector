@@ -82,7 +82,7 @@ if __name__ == "__main__":
     from utils.medialoader import MediaLoader
     from utils.logger import get_logger, init_logger
 
-    update_config(cfg, args='./config.yaml')
+    update_config(cfg, args='./configs/config.yaml')
     init_logger(cfg)
     logger = get_logger()
 

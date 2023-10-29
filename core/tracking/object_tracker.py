@@ -50,7 +50,7 @@ if __name__ == "__main__":
     from utils.medialoader import MediaLoader
     from core.bbox import BBox
 
-    update_config(cfg, args='./config.yaml')
+    update_config(cfg, args='./configs/config.yaml')
     init_logger(cfg)
     logger = get_logger()
 

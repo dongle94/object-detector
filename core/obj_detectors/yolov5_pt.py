@@ -10,11 +10,9 @@ FILE = Path(__file__).resolve()
 ROOT = FILE.parents[2]
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
-os.chdir(ROOT)
 
 from core.obj_detectors.models.yolo import check_img_size, letterbox, non_max_suppression, scale_boxes
 from core.obj_detectors.models.torch_utils import select_device
-
 
 
 class YoloDetector(nn.Module):
@@ -62,7 +60,6 @@ class YoloDetector(nn.Module):
         else:
             return self.from_numpy(y)
 
-
     def postprocess(self, pred, im_shape, im0_shape, conf_thres=0.25, nms_iou=0.45, agnostic_nms=False, max_det=100):
         pred = non_max_suppression(pred, classes=self.classes, conf_thres=conf_thres, iou_thres=nms_iou,
                                    agnostic=agnostic_nms, max_det=max_det)[0]
@@ -104,7 +101,7 @@ def attempt_load(weight, device=None, inplace=True, fuse=True):
 
 
 if __name__ == "__main__":
-    model = YoloDetector(weight='./weights/yolov5s.pt', device=0, img_size=640)
+    model = YoloDetector(weight='./weights/yolov5s6.pt', device=0, img_size=1280)
     model.warmup()
 
     import cv2

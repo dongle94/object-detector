@@ -10,9 +10,9 @@ FILE = Path(__file__).resolve()
 ROOT = FILE.parents[2]
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
-os.chdir(ROOT)
 
 from core.obj_detectors.models.image_processing import letterbox, non_max_suppression, scale_boxes
+
 
 class YoloOnnxDetector(object):
     def __init__(self, weight, device='cpu', img_size=640, fp16=False):
@@ -77,7 +77,6 @@ class YoloOnnxDetector(object):
         return pred, det
 
 
-
 if __name__ == "__main__":
     model = YoloOnnxDetector(weight="./weights/yolov5s6.onnx",
                              device=0,
@@ -97,7 +96,6 @@ if __name__ == "__main__":
         x1, y1, x2, y2 = map(int, d[:4])
         cv2.rectangle(im0, (x1, y1), (x2, y2), (128, 128, 255), thickness=2, lineType=cv2.LINE_AA)
         cv2.putText(im0, f"{model.names[int(d[-1])]}: {d[-2]:.2f}", (x1, y1+10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (128, 0, 255), 1)
-
 
     cv2.imshow("_", im0)
     cv2.waitKey(0)

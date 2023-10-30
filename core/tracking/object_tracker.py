@@ -6,15 +6,11 @@ FILE = Path(__file__).resolve()
 ROOT = FILE.parents[2]
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
-os.chdir(ROOT)
 
 
 class ObjectTracker(object):
     def __init__(self, cfg):
-        if os.path.abspath(cfg.TRACK_MODEL_PATH) != cfg.TRACK_MODEL_PATH:
-            weight = os.path.abspath(os.path.join(ROOT, cfg.TRACK_MODEL_PATH))
-        else:
-            weight = os.path.abspath(cfg.TRACK_MODEL_PATH)
+        weight = os.path.abspath(cfg.TRACK_MODEL_PATH)
         self.tracker_type = cfg.TRACK_MODEL_TYPE.lower()
 
         if self.tracker_type == 'deepocsort':

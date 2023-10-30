@@ -18,6 +18,7 @@ from .reid_model_factory import (
 )
 from .backbones import build_model
 
+
 # from ..utils.checks import TestRequirements
 # __tr = TestRequirements()
 
@@ -48,9 +49,9 @@ class ReIDDetectMultiBackend(nn.Module):
 
         # Build transform functions
         self.device = select_device(device)
-        self.image_size=(256, 128)
-        self.pixel_mean=[0.485, 0.456, 0.406]
-        self.pixel_std=[0.229, 0.224, 0.225]
+        self.image_size = (256, 128)
+        self.pixel_mean = [0.485, 0.456, 0.406]
+        self.pixel_std = [0.229, 0.224, 0.225]
         self.transforms = []
         self.transforms += [T.Resize(self.image_size)]
         self.transforms += [T.ToTensor()]
@@ -85,9 +86,9 @@ class ReIDDetectMultiBackend(nn.Module):
         if self.pt:  # PyTorch
             # populate model arch with weights
             if w and w.is_file() and w.suffix == '.pt':
-                load_pretrained_weights(self.model, w) 
+                load_pretrained_weights(self.model, w)
             self.model.to(device).eval()
-            self.model.half() if self.fp16 else  self.model.float()
+            self.model.half() if self.fp16 else self.model.float()
         elif self.onnx:  # ONNX Runtime
             get_logger().info(f'Loading {w} for ONNX Runtime inference...')
             cuda = torch.cuda.is_available() and device.type != 'cpu'
@@ -150,13 +151,13 @@ class ReIDDetectMultiBackend(nn.Module):
         return images
 
     def forward(self, im_batch):
-        
+
         # preprocess batch
         im_batch = self._preprocess(im_batch)
 
         # batch to half
         if self.fp16 and im_batch.dtype != torch.float16:
-           im_batch = im_batch.half()
+            im_batch = im_batch.half()
 
         # batch processing
         features = []

@@ -2,24 +2,19 @@ import os
 import sys
 
 from pathlib import Path
-
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[2]
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
-os.chdir(ROOT)
 
 from utils.logger import get_logger
 
 
 class ObjectDetector(object):
     def __init__(self, cfg=None):
+        self.logger = get_logger(cfg.LOGGER_NAME)
         self.cfg = cfg
-        # Detection model configuration
-        if os.path.abspath(cfg.DET_MODEL_PATH) != cfg.DET_MODEL_PATH:
-            weight = os.path.abspath(os.path.join(ROOT, cfg.DET_MODEL_PATH))
-        else:
-            weight = os.path.abspath(cfg.DET_MODEL_PATH)
+        weight = os.path.abspath(cfg.DET_MODEL_PATH)
         self.detector_type = cfg.DET_MODEL_TYPE.lower()
 
         if self.detector_type == "yolo":
@@ -44,7 +39,7 @@ class ObjectDetector(object):
 
             # warm up
             self.detector.warmup(imgsz=(1, 3, img_size, img_size))
-            get_logger().info(f"Successfully loaded weight from {weight}")
+            self.logger.info(f"Successfully loaded weight from {weight}")
 
     def preprocess(self, img):
         if self.detector_type == "yolo":

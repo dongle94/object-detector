@@ -3,8 +3,8 @@ DEVICE: 0
 
 # Object Detector
 DET_MODEL_TYPE: "yolo"
-DET_MODEL_PATH: './weights/yolov5s.pt'
-IMG_SIZE: 640
+DET_MODEL_PATH: './weights/yolov5s6.pt'
+IMG_SIZE: 1280
 HALF: false
 
 # Object Tracker

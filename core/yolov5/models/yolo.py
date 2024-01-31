@@ -297,6 +297,9 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
     return nn.Sequential(*layers), sorted(save)
 
 
+Model = DetectionModel
+
+
 if __name__ == "__main__":
     # Check model is valid
     parser = argparse.ArgumentParser()

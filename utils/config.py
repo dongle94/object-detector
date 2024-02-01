@@ -1,62 +1,45 @@
-from yacs.config import CfgNode as CN
+import yaml
 
 
-_C = CN()
-
-# Envrionments
-_C.DEVICE = None
-
-# Media
-_C.MEDIA_SOURCE = "0"
-_C.MEDIA_OPT_AUTO = True
-_C.MEDIA_WIDTH = 1280
-_C.MEDIA_HEIGHT = 720
-_C.MEDIA_FPS = 30
-
-# Object Detector
-_C.IMG_SIZE = 640
-_C.DET_MODEL_TYPE = ""
-_C.DET_MODEL_PATH = ""
-_C.HALF = False
-_C.OBJ_CLASSES = None
-_C.CONF_THRES = 0.5
-_C.NMS_IOU = 0.45
-_C.AGNOSTIC_NMS = True
-_C.MAX_DET = 100
-
-# Object Tracker
-_C.TRACK_USE_ENCODER = True
-_C.TRACK_MODEL_TYPE = ""
-_C.TRACK_MODEL_PATH = ""
-_C.TRACK_HALF = False
-_C.REGISTER_TIME = 1
-_C.REGISTER_FRAME = 10
-
-# Logger
-_C.LOG_LEVEL = 'DEBUG'
-_C.CONSOLE_LOG = False
-_C.CONSOLE_LOG_INTERVAL = 10
-_C.LOGGER_NAME = ""
-_C.FILE_LOG = False
-_C.LOG_FILE_DIR = './log/'
-_C.LOG_FILE_SIZE = 100
-_C.LOG_FILE_COUNTER = 10
-_C.LOG_FILE_ROTATE_TIME = "D"
-_C.LOG_FILE_ROTATE_INTERVAL = 1
+class Namespace(object):
+    pass
 
 
-def update_config(cfg, args):
-    if not args:
-        print("-- No exist Config File --")
-        return
-
-    cfg.defrost()
-    cfg.merge_from_file(args)
-
-    cfg.freeze()
+config = Namespace()
 
 
-if __name__ == "__main__":
-    import sys
-    with open(sys.argv[1], 'w') as f:
-        print(_C, file=f)
+def set_config(file):
+    with open(file, 'r') as f:
+        _config = yaml.load(f, Loader=yaml.FullLoader)
+
+    # Env
+    config.device = _config['ENV']['DEVICE']
+    config.gpu_num = _config['ENV']['GPU_NUM']
+
+    # Det
+    config.det_model_type = _config['DET']['MODEL_TYPE']
+    config.det_model_path = _config['DET']['DET_MODEL_PATH']
+    config.det_half = _config['DET']['HALF']
+    config.det_conf_thres = _config['DET']['CONF_THRES']
+    config.det_obj_classes = _config['DET']['OBJ_CLASSES']
+
+    # YOLOV5
+    config.yolov5_img_size = _config['YOLOV5']['IMG_SIZE']
+    config.yolov5_nms_iou = _config['YOLOV5']['NMS_IOU']
+    config.yolov5_agnostic_nms = _config['YOLOV5']['AGNOSTIC_NMS']
+    config.yolov5_max_det = _config['YOLOV5']['MAX_DET']
+
+    # Logger
+    config.log_level = _config['LOG']['LOG_LEVEL']
+    config.logger_name = _config['LOG']['LOGGER_NAME']
+    config.console_log = _config['LOG']['CONSOLE_LOG']
+    config.console_log_interval = _config['LOG']['CONSOLE_LOG_INTERVAL']
+    config.file_log = _config['LOG']['FILE_LOG']
+    config.file_log_dir = _config['LOG']['FILE_LOG_DIR']
+    config.file_log_counter = _config['LOG']['FILE_LOG_COUNTER']
+    config.file_log_rotate_time = _config['LOG']['FILE_LOG_ROTATE_TIME']
+    config.file_log_rotate_interval = _config['LOG']['FILE_LOG_ROTATE_INTERVAL']
+
+
+def get_config():
+    return config

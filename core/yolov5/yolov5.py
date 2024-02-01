@@ -5,7 +5,7 @@ import numpy as np
 from typing import Union
 from pathlib import Path
 
-import torch.cuda
+import torch
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[2]
@@ -81,8 +81,15 @@ class Yolov5Torch(YOLOV5):
 
 if __name__ == "__main__":
     import cv2
+    from utils.config import set_config, get_config
+
+    set_config('./configs/config.yaml')
+    cfg = get_config()
+
     # device: cpu, cuda, mps
-    yolov5 = Yolov5Torch("./weights/yolov5m.pt", device='cpu', fp16=True, auto=False, gpu_num=0)
+    yolov5 = Yolov5Torch(cfg.det_model_path, device=cfg.device, img_size=cfg.yolov5_img_size, fp16=cfg.det_half,
+                         auto=False, gpu_num=cfg.gpu_num, conf_thres=cfg.det_conf_thres, iou_thres=cfg.yolov5_nms_iou,
+                         agnostic=cfg.yolov5_agnostic_nms, max_det=cfg.yolov5_max_det, classes=cfg.det_obj_classes)
     yolov5.warmup()
 
     _im = cv2.imread('./data/images/army.jpg')

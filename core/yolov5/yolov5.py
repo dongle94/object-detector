@@ -1,3 +1,4 @@
+import time
 import copy
 import numpy as np
 from typing import Union
@@ -36,7 +37,9 @@ class Yolov5Torch(YOLOV5):
 
     def warmup(self, imgsz=(1, 3, 640, 640)):
         im = torch.empty(*imgsz, dtype=torch.half if self.fp16 else torch.float, device=self.device)
-        print("-- Yolov5 Detector warmup --")
+        t = time.time()
+        self.infer(im)  # warmup
+        print(f"-- Yolov5 Detector warmup: {time.time()-t:.6f} sec --")
 
     def preprocess(self, img: np.ndarray):
         im = letterbox(img, new_shape=self.img_size, auto=self.auto, stride=self.stride)[0]  # padded resize
@@ -70,11 +73,29 @@ class Yolov5Torch(YOLOV5):
 
 
 if __name__ == "__main__":
-    import numpy as np
-    yolov5 = Yolov5Torch("./weights/yolov5m.pt", device='mps', fp16=True, auto=False)
+    import cv2
+    # device: cpu, cuda, mps
+    yolov5 = Yolov5Torch("./weights/yolov5m.pt", device='cpu', fp16=True, auto=False, gpu_num=0)
     yolov5.warmup()
 
-    _im = np.zeros((1280, 720, 3), dtype=np.uint8)
+    _im = cv2.imread('./data/images/army.jpg')
+    t0 = time.time()
     _im, _im0 = yolov5.preprocess(_im)
+    t1 = time.time()
     y = yolov5.infer(_im)
-    y = yolov5.postprocess(y, _im.size(), _im0.shape)
+    t2 = time.time()
+    pred, det = yolov5.postprocess(y, _im.size(), _im0.shape)
+    t3 = time.time()
+
+    det = det.cpu().numpy()[0][:4]
+    cv2.rectangle(
+        _im0,
+        (int(det[0]), int(det[1])),
+        (int(det[2]), int(det[3])),
+        (0, 0, 255),
+        2,
+        cv2.LINE_AA
+    )
+    cv2.imshow('result', _im0)
+    cv2.waitKey(0)
+    print(f"{_im0.shape} size image - pre: {t1-t0:.6f} / infer: {t2-t1:.6f} / post: {t3-t2:.6f}")

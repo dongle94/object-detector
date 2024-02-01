@@ -4,14 +4,14 @@ class YOLOV5(object):
     def __init__(self):
         pass
 
-    def warmup(self):
+    def warmup(self, img_size):
         pass
 
-    def preprocess(self):
+    def preprocess(self, img):
         pass
 
-    def infer(self):
+    def infer(self, img):
         pass
 
-    def postprocess(self):
+    def postprocess(self, pred, im_shape, im0_shape):
         pass

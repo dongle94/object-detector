@@ -1,9 +1,16 @@
+import sys
 import time
 import copy
 import numpy as np
 from typing import Union
+from pathlib import Path
 
 import torch.cuda
+
+FILE = Path(__file__).resolve()
+ROOT = FILE.parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))
 
 from core.yolov5 import YOLOV5
 from core.yolov5.yolov5_utils.torch_utils import select_device

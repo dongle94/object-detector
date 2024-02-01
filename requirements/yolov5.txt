@@ -2,8 +2,7 @@
 
 # requirements for yolov5
 
-Pillow
-pandas>=1.1.4
---extra-index-url https://download.pytorch.org/whl/cu117
+# Pillow
+--extra-index-url https://download.pytorch.org/whl/cu118
 torch==2.0.1
 torchvision==0.15.2

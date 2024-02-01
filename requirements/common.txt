@@ -1,7 +1,8 @@
 pyyaml
-pyside6==6.5.1.1
-yacs==0.1.8
+opencv-python==4.8.0.74
 numpy==1.23.5
+
+# pyside6==6.5.1.1
+yacs==0.1.8
 tqdm
-opencv-python==4.5.4.60
 shapely==2.0.1

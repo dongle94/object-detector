@@ -26,7 +26,11 @@ class Yolov5Torch(YOLOV5):
         super().__init__()
         self.device = select_device(device=device, gpu_num=gpu_num)
         self.cuda = torch.cuda.is_available() and device != "cpu"
-        self.fp16 = True if fp16 is True and self.device.type != "cpu" else False
+        if fp16 is True and self.device.type != "cpu":
+            self.fp16 = True
+        else:
+            self.fp16 = False
+            print("Yolov5 pytorch model not support cpu version's fp16. It apply fp32.")
         model = attempt_load(weight, device=self.device, inplace=True, fuse=fuse)
         model.half() if self.fp16 else model.float()
         self.model = model
@@ -61,8 +65,6 @@ class Yolov5Torch(YOLOV5):
         return im, img
 
     def infer(self, im):
-        if self.fp16 and im.dtype != torch.float16:
-            im = im.half()
         y = self.model(im)
         return y
 
@@ -92,24 +94,25 @@ if __name__ == "__main__":
                          agnostic=cfg.yolov5_agnostic_nms, max_det=cfg.yolov5_max_det, classes=cfg.det_obj_classes)
     yolov5.warmup()
 
-    _im = cv2.imread('./data/images/army.jpg')
+    _im = cv2.imread('./data/images/sample.jpg')
     t0 = time.time()
     _im, _im0 = yolov5.preprocess(_im)
     t1 = time.time()
-    y = yolov5.infer(_im)
+    _y = yolov5.infer(_im)
     t2 = time.time()
-    pred, det = yolov5.postprocess(y, _im.size(), _im0.shape)
+    _pred, _det = yolov5.postprocess(_y, _im.size(), _im0.shape)
     t3 = time.time()
 
-    det = det.cpu().numpy()[0][:4]
-    cv2.rectangle(
-        _im0,
-        (int(det[0]), int(det[1])),
-        (int(det[2]), int(det[3])),
-        (0, 0, 255),
-        2,
-        cv2.LINE_AA
-    )
+    _det = _det.cpu().numpy()
+    for d in _det:
+        cv2.rectangle(
+            _im0,
+            (int(d[0]), int(d[1])),
+            (int(d[2]), int(d[3])),
+            (0, 0, 255),
+            1,
+            cv2.LINE_AA
+        )
     cv2.imshow('result', _im0)
     cv2.waitKey(0)
     print(f"{_im0.shape} size image - pre: {t1-t0:.6f} / infer: {t2-t1:.6f} / post: {t3-t2:.6f}")

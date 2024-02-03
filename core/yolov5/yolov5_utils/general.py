@@ -6,7 +6,7 @@ import numpy as np
 import torch
 import torchvision
 
-from core.yolov5.yolov5_utils.metrics import box_iou
+from core.yolov5.yolov5_utils.metrics import box_iou, box_iou_np
 
 
 def check_version(current='0.0.0', minimum='0.0.0', name='version ', pinned=False, hard=False, verbose=False):
@@ -159,6 +159,92 @@ def non_max_suppression(
             break  # time limit exceeded
 
     return output
+
+
+def non_max_suppression_np(
+        prediction: np.ndarray,
+        conf_thres: float = 0.25,
+        iou_thres: float = 0.45,
+        classes=None,
+        agnostic=False,
+        multi_label=False,
+        max_det=300
+    ):
+    """Non-Maximum Suppression (NMS) on inference results to reject overlapping detections
+
+        Returns:
+             list of detections, on (n,6) tensor per image [xyxy, conf, cls]
+        """
+    # Checks
+    if isinstance(prediction, (list, tuple)):  # YOLOv5 model in validation model, output = (inference_out, loss_out)
+        prediction = prediction[0]  # select only inference output
+
+    bs = prediction.shape[0]
+    nc = prediction.shape[2] - 5
+    xc = prediction[..., 4] > conf_thres       # (bs, 25200,) -> True/False
+
+    max_wh = 7680  # (pixels) maximum box width and height
+    max_nms = 30000 # maximum number of boxes
+    time_limit = 0.5 + 0.05 * bs  # seconds to quit after
+
+    t = time.time()
+    mi = 5 + nc
+    output = [np.zeros((0, 6))] * bs
+    for xi, x in enumerate(prediction): # image batch index, prediction
+        x = x[xc[xi]]
+
+        if not prediction.shape[0]:
+            continue
+
+        # Compute conf
+        x[:, 5:] *= x[:, 4:5]      # conf = loc_conf * cls_conf
+
+        # Box
+        box = xywh2xyxy(x[:, :4])
+        mask = x[:, mi:]
+
+        conf = np.max(x[:, 5:mi], axis=1, keepdims=True)
+        j = np.argmax(x[:, 5:mi], axis=1, keepdims=True)
+        x = np.concatenate((box, conf, j, mask), axis=1, dtype=np.float32)
+
+        # Filter by class
+        if classes is not None:
+            x = x[(x[:, 5:6] == np.array(classes)).any(1)]
+
+        n = x.shape[0]
+        if not n:
+            continue
+        elif n > max_nms:
+            x = x[x[:, 4].argsort()[::-1][:max_nms]]
+        else:
+            x = x[x[:, 4].argsort()[::-1]]
+
+        # Batched NMS
+        c = x[:, 5:6] * (0 if agnostic else max_wh)  # classes
+        boxes, scores = x[:, :4] + c, x[:, 4]   # boxes (offset by class), scores
+        categories = x[:, 5]
+        rows, _ = x.shape
+        ious = box_iou_np(boxes, boxes)
+        ious -= np.eye(rows)
+
+        keep = np.ones(rows, dtype=bool)
+
+        for index, (iou, category) in enumerate(zip(ious, categories)):
+            if not keep[index]:
+                continue
+            condition = (iou > iou_thres) & (categories == category)
+            keep = keep & ~condition
+
+        i = keep.nonzero()[0]
+        if i.shape[0] > max_det:  # limit detections
+            i = i[:max_det]
+
+        output[xi] = x[i]
+        if (time.time() - t) > time_limit:
+            print(f'WARNING ⚠️ NMS time limit {time_limit:.3f}s exceeded')
+            break  # time limit exceeded
+
+    return np.array(output)
 
 
 def make_divisible(x, divisor):

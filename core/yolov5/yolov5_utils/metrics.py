@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 
 
 def box_iou(box1, box2, eps=1e-7):
@@ -20,3 +21,19 @@ def box_iou(box1, box2, eps=1e-7):
 
     # IoU = inter / (area1 + area2 - inter)
     return inter / ((a2 - a1).prod(2) + (b2 - b1).prod(2) - inter + eps)
+
+
+def box_iou_np(boxes_a: np.ndarray, boxes_b: np.ndarray, eps=1e-7) -> np.ndarray:
+    def box_area(box):
+        return (box[2] - box[0]) * (box[3] - box[1])
+
+    area_a = box_area(boxes_a.T)
+    area_b = box_area(boxes_b.T)
+
+    top_left = np.maximum(boxes_a[:, None, :2], boxes_b[:, :2])
+    bottom_right = np.minimum(boxes_a[:, None, 2:], boxes_b[:, 2:])
+
+    area_inter = np.prod(
+        np.clip(bottom_right - top_left, a_min=0, a_max=None), 2)
+
+    return area_inter / (area_a[:] + area_b - area_inter + eps)

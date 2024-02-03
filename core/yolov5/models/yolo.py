@@ -10,17 +10,18 @@ import torch
 import torch.nn as nn
 
 FILE = Path(__file__).resolve()
-ROOT = FILE.parents[1]
+ROOT = FILE.parents[3]
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
-from models.common import (Bottleneck, BottleneckCSP, Conv, CrossConv, C3, C3x, C3TR, C3SPP, C3Ghost, Concat, Contract,
-                           DWConv, DWConvTranspose2d, Expand, Focus, GhostConv, GhostBottleneck, SPP, SPPF)
-from models.experimental import MixConv2d
-from yolov5_utils.autoanchor import check_anchor_order
-from yolov5_utils.general import check_version, make_divisible
-from yolov5_utils.torch_utils import (fuse_conv_and_bn, initialize_weights, model_info, profile, scale_img,
-                                      select_device, time_sync)
+from core.yolov5.models.common import (Bottleneck, BottleneckCSP, Conv, CrossConv, C3, C3x, C3TR, C3SPP, C3Ghost,
+                                       Concat, Contract, DWConv, DWConvTranspose2d, Expand, Focus, GhostConv,
+                                       GhostBottleneck, SPP, SPPF)
+from core.yolov5.models.experimental import MixConv2d
+from core.yolov5.yolov5_utils.autoanchor import check_anchor_order
+from core.yolov5.yolov5_utils.general import check_version, make_divisible
+from core.yolov5.yolov5_utils.torch_utils import (fuse_conv_and_bn, initialize_weights, model_info, profile, scale_img,
+                                                  select_device, time_sync)
 
 try:
     import thop  # for FLOPs computation
@@ -303,7 +304,7 @@ Model = DetectionModel
 if __name__ == "__main__":
     # Check model is valid
     parser = argparse.ArgumentParser()
-    parser.add_argument('--cfg', type=str, default='yolov5s.yaml', help='model.yaml')
+    parser.add_argument('--cfg', type=str, default='./corey/yolov5/models/olov5s.yaml', help='model.yaml')
     parser.add_argument('--batch-size', type=int, default=1, help='total batch size for all GPUs')
     parser.add_argument('--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     parser.add_argument('--profile', action='store_true', help='profile model speed')

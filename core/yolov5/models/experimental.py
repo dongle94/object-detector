@@ -1,7 +1,14 @@
+import sys
 import math
 import numpy as np
+from pathlib import Path
 import torch
 import torch.nn as nn
+
+FILE = Path(__file__).resolve()
+ROOT = FILE.parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))
 
 
 class MixConv2d(nn.Module):

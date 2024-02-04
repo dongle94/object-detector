@@ -10,6 +10,7 @@ def box_iou(box1, box2, eps=1e-7):
     Arguments:
         box1 (Tensor[N, 4])
         box2 (Tensor[M, 4])
+        eps (float, optional): A small value to avoid division by zero. Defaults to 1e-7.
     Returns:
         iou (Tensor[N, M]): the NxM matrix containing the pairwise
             IoU values for every element in boxes1 and boxes2
@@ -23,17 +24,22 @@ def box_iou(box1, box2, eps=1e-7):
     return inter / ((a2 - a1).prod(2) + (b2 - b1).prod(2) - inter + eps)
 
 
-def box_iou_np(boxes_a: np.ndarray, boxes_b: np.ndarray, eps=1e-7) -> np.ndarray:
-    def box_area(box):
-        return (box[2] - box[0]) * (box[3] - box[1])
+def box_iou_np(box1, box2, eps=1e-7):
+    """
+    Calculate intersection-over-union (IoU) of boxes.
+    Both sets of boxes are expected to be in (x1, y1, x2, y2) format.
 
-    area_a = box_area(boxes_a.T)
-    area_b = box_area(boxes_b.T)
+    Args:
+        box1 (numpy array): A numpy array of shape (N, 4) representing N bounding boxes.
+        box2 (numpy array): A numpy array of shape (M, 4) representing M bounding boxes.
+        eps (float, optional): A small value to avoid division by zero. Defaults to 1e-7.
 
-    top_left = np.maximum(boxes_a[:, None, :2], boxes_b[:, :2])
-    bottom_right = np.minimum(boxes_a[:, None, 2:], boxes_b[:, 2:])
+    Returns:
+        (numpy array): An NxM numpy array containing the pairwise IoU values for every element in box1 and box2.
+    """
 
-    area_inter = np.prod(
-        np.clip(bottom_right - top_left, a_min=0, a_max=None), 2)
+    (a1, a2), (b1, b2) = np.split(np.expand_dims(box1, axis=1), 2), np.split(np.expand_dims(box2, axis=1), 2)
+    inter = np.clip((np.min(a2, b2) - np.max(a1, b1)), a_min=0, a_max=None) * 2
 
-    return area_inter / (area_a[:] + area_b - area_inter + eps)
+    # IoU = inter / (area1 + area2 - inter)
+    return inter / (((a2 - a1) * 2) + ((b2 - b1) * 2) - inter + eps)

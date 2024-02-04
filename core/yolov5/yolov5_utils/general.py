@@ -168,8 +168,10 @@ def non_max_suppression_np(
         classes=None,
         agnostic=False,
         multi_label=False,
-        max_det=300
-    ):
+        labels=(),
+        max_det=300,
+        nm=0,  # number of masks
+):
     """Non-Maximum Suppression (NMS) on inference results to reject overlapping detections
 
         Returns:
@@ -183,17 +185,34 @@ def non_max_suppression_np(
     nc = prediction.shape[2] - 5
     xc = prediction[..., 4] > conf_thres       # (bs, 25200,) -> True/False
 
+    # Check
+    assert 0 <= conf_thres <= 1, f'Invalid Confidence threshold {conf_thres}, valid values are between 0.0 and 1.0'
+    assert 0 <= iou_thres <= 1, f'Invalid IoU {iou_thres}, valid values are between 0.0 and 1.0'
+
     max_wh = 7680  # (pixels) maximum box width and height
-    max_nms = 30000 # maximum number of boxes
+    max_nms = 30000  # maximum number of boxes into torchvision.ops.nms()
     time_limit = 0.5 + 0.05 * bs  # seconds to quit after
+    redundant = True  # require redundant detections
+    multi_label &= nc > 1  # multiple labels per box (adds 0.5ms/img)
+    merge = False  # use merge-NMS
 
     t = time.time()
     mi = 5 + nc
     output = [np.zeros((0, 6))] * bs
-    for xi, x in enumerate(prediction): # image batch index, prediction
+    for xi, x in enumerate(prediction):  # image batch index, prediction
+        # Apply constraints
+        # x[((x[..., 2:4] < min_wh) | (x[..., 2:4] > max_wh)).any(1), 4] = 0  # width-height
         x = x[xc[xi]]
 
-        if not prediction.shape[0]:
+        # Cat apriori labels if autolabelling
+        if labels and len(labels[xi]):
+            lb = labels[xi]
+            v = np.zeros((len(lb), nc + nm + 5))
+            v[:, :4] = lb[:, 1:5]  # box
+            v[range(len(lb)), lb[:, 0].long() + 4] = 1.0  # cls
+            x = np.concatenate((x, v), axis=0)
+
+        if not x.shape[0]:
             continue
 
         # Compute conf
@@ -203,6 +222,11 @@ def non_max_suppression_np(
         box = xywh2xyxy(x[:, :4])
         mask = x[:, mi:]
 
+        # box, cls = np.array_split(x, [4], axis=1)
+        # if multi_label:
+        #     i, j = np.where(cls > conf_thres)
+        #     x = np.concatenate((box[i], x[i, 4 + j, None], j[:, None], mask[i]), 1)
+        # else:
         conf = np.max(x[:, 5:mi], axis=1, keepdims=True)
         j = np.argmax(x[:, 5:mi], axis=1, keepdims=True)
         x = np.concatenate((box, conf, j, mask), axis=1, dtype=np.float32)
@@ -222,29 +246,54 @@ def non_max_suppression_np(
         # Batched NMS
         c = x[:, 5:6] * (0 if agnostic else max_wh)  # classes
         boxes, scores = x[:, :4] + c, x[:, 4]   # boxes (offset by class), scores
-        categories = x[:, 5]
-        rows, _ = x.shape
-        ious = box_iou_np(boxes, boxes)
-        ious -= np.eye(rows)
 
-        keep = np.ones(rows, dtype=bool)
+        i = nms(x, iou_thres)  # NMS
+        i = i[:max_det]
+        if merge and (1 < n < 3E3):  # Merge NMS (boxes merged using weighted mean)
+            # Update boxes as boxes(i,4) = weights(i,n) * boxes(n,4)
+            iou = box_iou_np(boxes[i], boxes) > iou_thres  # iou matrix
+            weights = iou * scores[None]  # box weights
+            x[i, :4] = torch.mm(weights, x[:, :4]).float() / weights.sum(1, keepdim=True)  # merged boxes
+            if redundant:
+                i = i[iou.sum(1) > 1]  # require redundancy
 
-        for index, (iou, category) in enumerate(zip(ious, categories)):
-            if not keep[index]:
-                continue
-            condition = (iou > iou_thres) & (categories == category)
-            keep = keep & ~condition
-
-        i = keep.nonzero()[0]
-        if i.shape[0] > max_det:  # limit detections
-            i = i[:max_det]
-
-        output[xi] = x[i]
+        output[xi] = x[np.array(i)]
         if (time.time() - t) > time_limit:
             print(f'WARNING ⚠️ NMS time limit {time_limit:.3f}s exceeded')
             break  # time limit exceeded
 
     return np.array(output)
+
+
+def nms(boxes, iou_thres=0.45, min_mode=False):
+    x1 = boxes[:, 0]
+    y1 = boxes[:, 1]
+    x2 = boxes[:, 2]
+    y2 = boxes[:, 3]
+    scores = boxes[:, 4]
+
+    areas = (x2 - x1 + 1) * (y2 - y1 + 1)
+    index_array = scores.argsort()[::-1]
+    keep = []
+    while index_array.size > 0:
+        keep.append(index_array[0])
+        x1_ = np.maximum(x1[index_array[0]], x1[index_array[1:]])
+        y1_ = np.maximum(y1[index_array[0]], y1[index_array[1:]])
+        x2_ = np.minimum(x2[index_array[0]], x2[index_array[1:]])
+        y2_ = np.minimum(y2[index_array[0]], y2[index_array[1:]])
+
+        w = np.maximum(0.0, x2_ - x1_ + 1)
+        h = np.maximum(0.0, y2_ - y1_ + 1)
+        inter = w * h
+
+        if min_mode:
+            overlap = inter / np.minimum(areas[index_array[0]], areas[index_array[1:]])
+        else:
+            overlap = inter / (areas[index_array[0]] + areas[index_array[1:]] - inter)
+
+        inds = np.where(overlap <= iou_thres)[0]
+        index_array = index_array[inds + 1]
+    return keep
 
 
 def make_divisible(x, divisor):

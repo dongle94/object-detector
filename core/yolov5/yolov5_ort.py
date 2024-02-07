@@ -95,10 +95,10 @@ class Yolov5ORT(YOLOV5):
     def preprocess(self, img: np.ndarray):
         im = letterbox(img, new_shape=self.img_size, auto=self.auto, stride=self.stride)[0]  # padded resize
         im = im.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
-        im = np.ascontiguousarray(im)  # contiguous
+        im = np.ascontiguousarray(im).astype(np.float32)  # contiguous
 
-        im = im.astype(np.float16) if self.fp16 else im.astype(np.float32)
         im /= 255.0
+        im = im.astype(np.float16) if self.fp16 else im.astype(np.float32)
         if len(im.shape) == 3:
             im = np.expand_dims(im, axis=0)  # expand for batch dim
 

@@ -1,23 +1,25 @@
 import os
 import sys
-
 from pathlib import Path
+
 FILE = Path(__file__).resolve()
-ROOT = FILE.parents[2]
+ROOT = FILE.parents[1]
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
+
+from utils.logger import get_logger
 
 
 class ObjectTracker(object):
     def __init__(self, cfg):
-        weight = os.path.abspath(cfg.TRACK_MODEL_PATH)
-        self.tracker_type = cfg.TRACK_MODEL_TYPE.lower()
+        weight = os.path.abspath(cfg.track_model_path)
+        self.tracker_type = cfg.track_model_type.lower()
 
         if self.tracker_type == 'deepocsort':
             from core.tracking.deepocsort import DeepOCSort
-            device = cfg.DEVICE
-            fp16 = cfg.TRACK_HALF
-            embedding_off = not cfg.TRACK_USE_ENCODER
+            device = cfg.device
+            fp16 = cfg.track_half
+            embedding_off = not cfg.track_use_encoder
 
             self.tracker = DeepOCSort(
                 model_weights=Path(weight),
@@ -38,20 +40,21 @@ if __name__ == "__main__":
     import cv2
     import numpy as np
 
-    from utils.config import _C as cfg
-    from utils.config import update_config
-    from utils.logger import get_logger, init_logger
+    from utils.config import set_config, get_config
+    from utils.logger import init_logger
 
-    from core.obj_detectors import ObjectDetector
+    from core.obj_detector import ObjectDetector
     from utils.medialoader import MediaLoader
     from core.bbox import BBox
 
-    update_config(cfg, args='./configs/config.yaml')
-    init_logger(cfg)
-    logger = get_logger()
+    set_config('./configs/config.yaml')
+    _cfg = get_config()
 
-    detector = ObjectDetector(cfg=cfg)
-    tracker = ObjectTracker(cfg=cfg)
+    init_logger(_cfg)
+    _logger = get_logger()
+
+    _detector = ObjectDetector(cfg=_cfg)
+    _tracker = ObjectTracker(cfg=_cfg)
 
     s = sys.argv[1]
     media_loader = MediaLoader(s)
@@ -72,9 +75,7 @@ if __name__ == "__main__":
         filter_x2, filter_y2 = int(img_w * (1 - filter_ratio)), int(img_h * (1 - filter_ratio))
 
         t0 = time.time()
-        im = detector.preprocess(frame)
-        _pred = detector.detect(im)
-        _pred, _det = detector.postprocess(_pred)
+        _det = _detector.run(frame)
 
         # box filtering
         _dets = []
@@ -82,13 +83,13 @@ if __name__ == "__main__":
         for _d in _det:
             if filter_x1 < (_d[0] + _d[2]) / 2 < filter_x2 and filter_y1 < (_d[1] + _d[3]) / 2 < filter_y2:
                 _dets.append(_d)
-                _boxes.append(BBox(tlbr=_d[:4], class_name=detector.names[_d[5]], conf=_d[4], imgsz=frame.shape))
+                _boxes.append(BBox(tlbr=_d[:4], class_name=_detector.names[_d[5]], conf=_d[4], imgsz=frame.shape))
         _det = np.array(_dets)
         t1 = time.time()
 
         # tracking update
         if len(_det):
-            track_ret = tracker.update(_det, frame)
+            track_ret = _tracker.update(_det, frame)
             if len(track_ret):
                 t_boxes = track_ret[:, 0:4].astype(np.int32)
                 t_ids = track_ret[:, 4].astype(np.int32)
@@ -122,5 +123,5 @@ if __name__ == "__main__":
 
         f_cnt += 1
         if f_cnt % 10 == 0:
-            logger.debug(
+            _logger.debug(
                 f"{f_cnt} Frame - det: {ts[0] / f_cnt:.4f} / tracking: {ts[1] / f_cnt:.4f}")

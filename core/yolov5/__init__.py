@@ -1,3 +1,4 @@
+import time
 
 
 class YOLOV5(object):
@@ -15,3 +16,6 @@ class YOLOV5(object):
 
     def postprocess(self, pred, im_shape, im0_shape):
         pass
+
+    def get_time(self):
+        return time.time()

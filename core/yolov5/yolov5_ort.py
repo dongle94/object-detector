@@ -27,6 +27,7 @@ class Yolov5ORT(YOLOV5):
         self.img_size = img_size
         self.auto = auto
         self.device = device
+        self.gpu_num = gpu_num
         self.cuda = ort.get_device() == 'GPU' and device == 'cuda'
         self.fp16 = True if fp16 is True else False
         providers = ['CPUExecutionProvider']
@@ -58,6 +59,9 @@ class Yolov5ORT(YOLOV5):
             weight = half_model
             print("Onnx model get fp16.")
         self.sess = ort.InferenceSession(weight, providers=providers)
+        self.io_binding = self.sess.io_binding()
+        if device == 'cuda':
+            self.io_binding.bind_output('output0')
 
         self.input_name = self.sess.get_inputs()[0].name
         self.output_names = [o.name for o in self.sess.get_outputs()]
@@ -77,6 +81,13 @@ class Yolov5ORT(YOLOV5):
 
     def warmup(self, imgsz=(1, 3, 640, 640)):
         im = np.zeros(imgsz, dtype=np.float16 if self.fp16 else np.float32)
+        if self.device == 'cuda':
+            im_ortval = ort.OrtValue.ortvalue_from_numpy(im, 'cuda', self.gpu_num)
+            element_type = np.float16 if self.fp16 else np.float32
+            self.io_binding.bind_input(
+                name='images', device_type=im_ortval.device_name(), device_id=self.gpu_num, element_type=element_type,
+                shape=im_ortval.shape(), buffer_ptr=im_ortval.data_ptr())
+
         t = time.time()
         self.infer(im)
         print(f"-- Yolov5 Onnx Detector warmup: {time.time()-t:.6f} sec --")
@@ -84,19 +95,32 @@ class Yolov5ORT(YOLOV5):
     def preprocess(self, img: np.ndarray):
         im = letterbox(img, new_shape=self.img_size, auto=self.auto, stride=self.stride)[0]  # padded resize
         im = im.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
-        im = np.ascontiguousarray(im)  # contiguous
+        im = np.ascontiguousarray(im).astype(np.float32)  # contiguous
 
-        im = im.astype(np.float16) if self.fp16 else im.astype(np.float32)
         im /= 255.0
+        im = im.astype(np.float16) if self.fp16 else im.astype(np.float32)
         if len(im.shape) == 3:
             im = np.expand_dims(im, axis=0)  # expand for batch dim
+
+        if self.device == 'cuda':
+            im_ortval = ort.OrtValue.ortvalue_from_numpy(im, self.device, self.gpu_num)
+            element_type = np.float16 if self.fp16 else np.float32
+            self.io_binding.bind_input(
+                name='images', device_type=im_ortval.device_name(), device_id=self.gpu_num, element_type=element_type,
+                shape=im_ortval.shape(), buffer_ptr=im_ortval.data_ptr())
         return im, img
 
     def infer(self, img):
-        ret = self.sess.run(self.output_names, {self.input_name: img})
+        if self.device == 'cuda':
+            self.sess.run_with_iobinding(self.io_binding)
+            ret = None      # output i/o gpu->cpu will execute in postprocess
+        else:
+            ret = self.sess.run(self.output_names, {self.input_name: img})
         return ret
 
     def postprocess(self, pred, im_shape, im0_shape):
+        if self.device == 'cuda':
+            pred = self.io_binding.copy_outputs_to_cpu()[0]
         pred = non_max_suppression_np(prediction=pred,
                                       iou_thres=self.iou_thres,
                                       conf_thres=self.conf_thres,
@@ -105,16 +129,6 @@ class Yolov5ORT(YOLOV5):
                                       max_det=self.max_det)[0]
         det = scale_boxes(im_shape[2:], copy.deepcopy(pred[:, :4]), im0_shape).round()
         det = np.concatenate([det, pred[:, 4:]], axis=1)
-
-
-        # pred = non_max_suppression(pred,
-        #                            conf_thres=self.conf_thres,
-        #                            iou_thres=self.iou_thres,
-        #                            classes=self.classes,
-        #                            agnostic=self.agnostic,
-        #                            max_det=self.max_det)[0]
-        # det = scale_boxes(im_shape[2:], copy.deepcopy(pred[:, :4]), im0_shape).round()
-        # det = torch.cat([det, pred[:, 4:]], dim=1)
 
         return pred, det
 
@@ -131,16 +145,16 @@ if __name__ == "__main__":
         gpu_num=cfg.gpu_num, conf_thres=cfg.det_conf_thres, iou_thres=cfg.yolov5_nms_iou,
         agnostic=cfg.yolov5_agnostic_nms, max_det=cfg.yolov5_max_det, classes=cfg.det_obj_classes
     )
-    yolov5.warmup()
+    yolov5.warmup(imgsz=(1, 3, cfg.yolov5_img_size, cfg.yolov5_img_size))
 
     _im = cv2.imread('./data/images/sample.jpg')
-    t0 = time.time()
+    t0 = yolov5.get_time()
     _im, _im0 = yolov5.preprocess(_im)
-    t1 = time.time()
+    t1 = yolov5.get_time()
     _y = yolov5.infer(_im)
-    t2 = time.time()
+    t2 = yolov5.get_time()
     _pred, _det = yolov5.postprocess(_y, _im.shape, _im0.shape)
-    t3 = time.time()
+    t3 = yolov5.get_time()
 
     for d in _det:
         cv2.rectangle(

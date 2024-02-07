@@ -80,6 +80,11 @@ class Yolov5Torch(YOLOV5):
 
         return pred, det
 
+    def get_time(self):
+        if self.device.type == 'cuda':
+            torch.cuda.synchronize()
+        return time.time()
+
 
 if __name__ == "__main__":
     import cv2
@@ -95,13 +100,13 @@ if __name__ == "__main__":
     yolov5.warmup()
 
     _im = cv2.imread('./data/images/sample.jpg')
-    t0 = time.time()
+    t0 = yolov5.get_time()
     _im, _im0 = yolov5.preprocess(_im)
-    t1 = time.time()
+    t1 = yolov5.get_time()
     _y = yolov5.infer(_im)
-    t2 = time.time()
+    t2 = yolov5.get_time()
     _pred, _det = yolov5.postprocess(_y, _im.size(), _im0.shape)
-    t3 = time.time()
+    t3 = yolov5.get_time()
 
     _det = _det.cpu().numpy()
     for d in _det:

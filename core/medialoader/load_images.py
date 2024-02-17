@@ -25,6 +25,7 @@ class LoadImages(LoadSample):
         images = [x for x in files if x.split('.')[-1].lower() in IMG_FORMATS]
         ni = len(images)
 
+        self.mode = 'image'
         self.files = images
         self.num_files = ni
 

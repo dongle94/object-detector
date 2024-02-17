@@ -19,6 +19,7 @@ def set_config(file):
     # Media
     config.media_source = _config['MEDIA']['SOURCE']
     config.media_opt_auto = _config['MEDIA']['OPT_AUTO']
+    config.media_fourcc = _config['MEDIA']['FOURCC']
     config.media_width = _config['MEDIA']['WIDTH']
     config.media_height = _config['MEDIA']['HEIGHT']
     config.media_fps = _config['MEDIA']['FPS']

@@ -7,6 +7,7 @@ ENV:
 MEDIA:
   SOURCE: "0"
   OPT_AUTO: True
+  FOURCC: "mp4v"
   WIDTH: 1280
   HEIGHT: 720
   FPS: 30

@@ -16,6 +16,13 @@ def set_config(file):
     config.device = _config['ENV']['DEVICE']
     config.gpu_num = _config['ENV']['GPU_NUM']
 
+    # Media
+    config.media_source = _config['MEDIA']['SOURCE']
+    config.media_opt_auto = _config['MEDIA']['OPT_AUTO']
+    config.media_width = _config['MEDIA']['WIDTH']
+    config.media_height = _config['MEDIA']['HEIGHT']
+    config.media_fps = _config['MEDIA']['FPS']
+
     # Det
     config.det_model_type = _config['DET']['MODEL_TYPE']
     config.det_model_path = _config['DET']['DET_MODEL_PATH']

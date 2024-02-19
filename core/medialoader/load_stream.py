@@ -1,4 +1,3 @@
-import os
 import cv2
 import math
 import time
@@ -10,10 +9,11 @@ from core.medialoader import LoadSample
 
 
 class LoadStream(LoadSample):
-    def __init__(self, source, stride=1, opt=None):
+    def __init__(self, source, stride=1, opt=None, bgr=True):
         super().__init__()
 
         self.stride = stride
+        self.bgr = bgr
         source = eval(source) if source.isnumeric() else source
 
         if platform.system() == 'Windows':
@@ -63,7 +63,8 @@ class LoadStream(LoadSample):
             raise StopIteration
 
         im = self.img.copy()
-        im = im[..., ::-1]
+        if self.bgr is False:       # rgb
+            im = im[..., ::-1]
 
         return im
 

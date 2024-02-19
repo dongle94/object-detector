@@ -7,8 +7,11 @@ IMG_FORMATS = 'bmp', 'dng', 'jpeg', 'jpg', 'mpo', 'png', 'tif', 'tiff', 'webp', 
 
 
 class LoadImages(LoadSample):
-    def __init__(self, path):
+    def __init__(self, path, bgr=True):
         super().__init__()
+
+        self.bgr = bgr
+
         files = []
         path = sorted(path) if isinstance(path, (list, tuple)) else [path]
         for p in path:
@@ -43,7 +46,8 @@ class LoadImages(LoadSample):
         self.count += 1
         im = cv2.imread(path)
         assert im is not None, f'Image Not Found {path}'
-        im = im[..., ::-1]
+        if self.bgr is False:
+            im = im[..., ::-1]
 
         return im
 

@@ -3,6 +3,15 @@ ENV:
   DEVICE: cpu     # cuda, cpu
   GPU_NUM: 0
 
+# Media
+MEDIA:
+  SOURCE: "0"
+  OPT_AUTO: True
+  FOURCC: "mp4v"
+  WIDTH: 1280
+  HEIGHT: 720
+  FPS: 30
+
 # Object Detector
 DET:
   MODEL_TYPE: yolov5

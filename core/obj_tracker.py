@@ -44,7 +44,7 @@ if __name__ == "__main__":
     from utils.logger import init_logger
 
     from core.obj_detector import ObjectDetector
-    from utils.medialoader import MediaLoader
+    from core.media_loader import MediaLoader
     from core.bbox import BBox
 
     set_config('./configs/config.yaml')
@@ -57,12 +57,7 @@ if __name__ == "__main__":
     _tracker = ObjectTracker(cfg=_cfg)
 
     s = sys.argv[1]
-    media_loader = MediaLoader(s)
-    media_loader.start()
-
-    while media_loader.is_frame_ready() is False:
-        time.sleep(0.01)
-        continue
+    media_loader = MediaLoader(s, realtime=0, bgr=True)
 
     f_cnt = 0
     ts = [0, 0, ]
@@ -75,7 +70,7 @@ if __name__ == "__main__":
         filter_x2, filter_y2 = int(img_w * (1 - filter_ratio)), int(img_h * (1 - filter_ratio))
 
         t0 = time.time()
-        _det = _detector.run(frame)
+        _det = _detector.run_np(frame)
 
         # box filtering
         _dets = []
@@ -122,6 +117,6 @@ if __name__ == "__main__":
             break
 
         f_cnt += 1
-        if f_cnt % 10 == 0:
+        if f_cnt % _cfg.console_log_interval == 0:
             _logger.debug(
                 f"{f_cnt} Frame - det: {ts[0] / f_cnt:.4f} / tracking: {ts[1] / f_cnt:.4f}")

@@ -100,7 +100,7 @@ class ObjectDetector(object):
 
 if __name__ == "__main__":
     import cv2
-    from core.medialoader import MediaLoader
+    from core.media_loader import MediaLoader
     from utils.logger import init_logger
     from utils.config import set_config, get_config
 
@@ -113,12 +113,7 @@ if __name__ == "__main__":
     _detector = ObjectDetector(cfg=_cfg)
 
     s = sys.argv[1]
-    media_loader = MediaLoader(s, realtime=True)
-    media_loader.start()
-
-    while media_loader.is_frame_ready() is False:
-        time.sleep(0.01)
-        continue
+    media_loader = MediaLoader(s, realtime=False)
 
     while True:
         frame = media_loader.get_frame()
@@ -134,5 +129,4 @@ if __name__ == "__main__":
             print("-- CV2 Stop --")
             break
 
-    media_loader.stop()
     print("-- Stop program --")

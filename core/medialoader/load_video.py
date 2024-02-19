@@ -9,7 +9,7 @@ VID_FORMATS = 'asf', 'avi', 'gif', 'm4v', 'mkv', 'mov', 'mp4', 'mpeg', 'mpg', 't
 
 
 class LoadVideo(LoadSample):
-    def __init__(self, path, stride=1, opt=None):
+    def __init__(self, path, stride=1):
         super().__init__()
 
         self.stride = stride
@@ -25,11 +25,6 @@ class LoadVideo(LoadSample):
 
         self.mode = 'video'
 
-        # TODO: Check valid
-        if opt is not None and opt.media_opt_auto is False:
-            cap.set(cv2.CAP_PROP_FRAME_WIDTH, opt.media_width)
-            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, opt.media_height)
-            cap.set(cv2.CAP_PROP_FPS, opt.media_fps)
         self.w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         self.h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 

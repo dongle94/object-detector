@@ -32,35 +32,39 @@ class LoadVideo(LoadSample):
             cap.set(cv2.CAP_PROP_FPS, opt.media_fps)
         self.w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         self.h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+        self.cap = cap
         fps = cap.get(cv2.CAP_PROP_FPS)
         self.fps = max((fps if math.isfinite(fps) else 0) % 100, 0) or 30  # 30 FPS fallback
-        self.frame = max(int(cap.get(cv2.CAP_PROP_FRAME_COUNT)), 0) or float('inf')
+        self.frame = 0
+        self.frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT) / self.stride)
 
     def __iter__(self):
         self.count = 0
         return self
 
     def __next__(self):
-        # if self.count == self.num_files:
-        #     raise StopIteration
-        #
-        # path = self.files[self.count]
-        #
-        # self.count += 1
-        # im = cv2.imread(path)
-        # assert im is not None, f'Image Not Found {path}'
-        # im = im[..., ::-1]
-        #
-        # return im
-        pass
+
+        for _ in range(self.stride):
+            self.cap.grab()
+        ret, im = self.cap.retrieve()
+        while not ret:
+            self.cap.release()
+            raise StopIteration
+
+        self.frame += 1
+        im = im[..., ::-1]
+
+        return im
 
     def __len__(self):
         pass
 
 
 if __name__ == "__main__":
-    p1 = './data/images/'
+    p1 = './data/videos/sample.mp4'
     loader = LoadVideo(p1)
     for _im in loader:
         _im = _im[..., ::-1]
         cv2.imshow('.', _im)
+        cv2.waitKey(1)

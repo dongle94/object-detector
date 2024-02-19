@@ -39,6 +39,9 @@ class LoadVideo(LoadSample):
         return self
 
     def __next__(self):
+        if cv2.waitKey(1) == ord('q'):
+            cv2.destroyAllWindows()
+            raise StopIteration
 
         for _ in range(self.stride):
             self.cap.grab()
@@ -62,4 +65,3 @@ if __name__ == "__main__":
     for _im in loader:
         _im = _im[..., ::-1]
         cv2.imshow('.', _im)
-        cv2.waitKey(1)

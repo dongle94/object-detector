@@ -27,44 +27,38 @@ def check_sources(source):
 
 
 class MediaLoader(object):
-    def __init__(self, source, stride=1, logger=None, realtime=True, opt=None, fast=True):
+    def __init__(self, source, stride=1, logger=None, realtime=False, opt=None, bgr=True):
 
         self.stride = stride
         self.logger = logger
-        # self.realtime = realtime
+        self.realtime = realtime
         self.opt = opt
-        self.fast = fast
+        self.bgr = bgr
 
         self.is_imgs, self.is_vid, self.is_stream = check_sources(source)
 
         if self.is_imgs:
-            dataset = load_images.LoadImages(source)
+            dataset = load_images.LoadImages(source, bgr=self.bgr)
         elif self.is_vid:
-            dataset = load_video.LoadVideo(source, stride=self.stride)
+            dataset = load_video.LoadVideo(source, stride=self.stride, realtime=self.realtime, bgr=self.bgr)
         elif self.is_stream:
-            dataset = load_stream.LoadStream(source, stride=self.stride, opt=self.opt)
+            dataset = load_stream.LoadStream(source, stride=self.stride, opt=self.opt, bgr=self.bgr)
         else:
             raise NotImplementedError(f'Invalid input: {source}')
 
         self.dataset = dataset
 
-        self.wait_ms = 1 / self.dataset.fps if self.is_vid is True and fast is False else 0
-        print(self.wait_ms, self.is_vid, self.dataset.fps)
-
         # self.alive = True
         # self.bpause = False
 
     def get_frame(self):
-        st = time.time()
         im = self.dataset.__next__()
-        et = time.time()
-        wait_t = self.wait_ms - (et-st) - 0.005
-        if self.is_vid is True and self.fast is True and wait_t > 0:
-            time.sleep(wait_t)
         return im
 
     def show_frame(self, title: str = 'frame', wait_sec: int = 0):
-        frame = self.get_frame()[..., ::-1]
+        frame = self.get_frame()
+        if self.bgr is False:
+            frame = frame[..., ::-1]
         cv2.imshow(title, frame)
         if cv2.waitKey(wait_sec) == ord('q'):
             if self.logger is not None:
@@ -81,7 +75,7 @@ if __name__ == "__main__":
 
     s = sys.argv[1]      # video file, webcam, rtsp stream... 0etc
 
-    _media_loader = MediaLoader(s, fast=True)
+    _media_loader = MediaLoader(s, bgr=True)
     print("-- MediaLoader is ready")
 
     _title = 'frame'

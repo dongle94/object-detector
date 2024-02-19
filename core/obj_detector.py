@@ -25,6 +25,8 @@ class ObjectDetector(object):
         conf_thres = cfg.det_conf_thres
         classes = cfg.det_obj_classes
 
+        self.framework = None
+
         if self.detector_type == "yolov5":
             img_size = cfg.yolov5_img_size
             iou_thres = cfg.yolov5_nms_iou
@@ -38,9 +40,11 @@ class ObjectDetector(object):
             if ext in ['.pt', '.pth']:
                 from core.yolov5.yolov5_pt import Yolov5Torch
                 model = Yolov5Torch
+                self.framework = 'torch'
             elif ext == '.onnx':
                 from core.yolov5.yolov5_ort import Yolov5ORT
                 model = Yolov5ORT
+                self.framework = 'onnx'
             else:
                 raise FileNotFoundError('No Yolov5 weight File!')
             self.detector = model(
@@ -95,6 +99,12 @@ class ObjectDetector(object):
         else:
             pred, det = None, None
 
+        return det
+
+    def run_np(self, img):
+        det = self.run(img)
+        if self.framework == 'torch':
+            det = det.cpu().numpy()
         return det
 
 

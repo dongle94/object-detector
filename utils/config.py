@@ -37,6 +37,12 @@ def set_config(file):
     config.yolov5_agnostic_nms = _config['YOLOV5']['AGNOSTIC_NMS']
     config.yolov5_max_det = _config['YOLOV5']['MAX_DET']
 
+    # TRACKER
+    config.track_use_encoder = _config['TRACK']['TRACK_USE_ENCODER']
+    config.track_model_type = _config['TRACK']['TRACK_MODEL_TYPE']
+    config.track_model_path = _config['TRACK']['TRACK_MODEL_PATH']
+    config.track_half = _config['TRACK']['TRACK_HALF']
+
     # Logger
     config.log_level = _config['LOG']['LOG_LEVEL']
     config.logger_name = _config['LOG']['LOGGER_NAME']

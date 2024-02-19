@@ -1,6 +1,6 @@
 # Environments
 ENV:
-  DEVICE: cpu     # cuda, cpu
+  DEVICE: cuda     # cuda, cpu
   GPU_NUM: 0
 
 # Media
@@ -15,9 +15,9 @@ MEDIA:
 # Object Detector
 DET:
   MODEL_TYPE: yolov5
-  DET_MODEL_PATH: './weights/yolov5s6.pt'
-  HALF: false
-  CONF_THRES: 0.5
+  DET_MODEL_PATH: './weights/yolov5s6.onnx'
+  HALF: True
+  CONF_THRES: 0.25
   OBJ_CLASSES: [0]
 
 YOLOV5:
@@ -27,17 +27,18 @@ YOLOV5:
   MAX_DET: 100
 
 # Object Tracker
-TRACK_USE_ENCODER: false
-TRACK_MODEL_TYPE: "deepocsort"
-TRACK_MODEL_PATH: "./weights/osnet_x0_25_market1501.pt"
-TRACK_HALF: false
+TRACK:
+  TRACK_USE_ENCODER: false
+  TRACK_MODEL_TYPE: "deepocsort"
+  TRACK_MODEL_PATH: "./weights/osnet_x0_25_market1501.pt"
+  TRACK_HALF: false
 
 # Logger
 LOG:
-  LOG_LEVEL: 'INFO'
+  LOG_LEVEL: 'debug'
   LOGGER_NAME: "OBJ"
   CONSOLE_LOG: true
-  CONSOLE_LOG_INTERVAL: 30
+  CONSOLE_LOG_INTERVAL: 100
   FILE_LOG: true
   FILE_LOG_DIR: './log/'
   FILE_LOG_COUNTER: 10

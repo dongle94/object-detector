@@ -56,7 +56,7 @@ class LoadVideo(LoadSample):
             ret, im = self.cap.retrieve()
             while not ret:
                 self.cap.release()
-                raise StopIteration
+                break
 
             self.img = im
             et = time.time()
@@ -70,9 +70,11 @@ class LoadVideo(LoadSample):
     def __next__(self):
         if cv2.waitKey(1) == ord('q'):
             cv2.destroyAllWindows()
-            raise StopIteration
+            raise StopIteration("User Stop Video")
 
         if self.realtime is True:
+            if self.img is None:
+                raise StopIteration("Video End")
             im = self.img.copy()
         else:
             for _ in range(self.stride):
@@ -80,9 +82,8 @@ class LoadVideo(LoadSample):
             ret, im = self.cap.retrieve()
             while not ret:
                 self.cap.release()
-                raise StopIteration
+                raise StopIteration("Video End")
 
-        self.frame += 1
         if self.bgr is False:
             im = im[..., ::-1]
 

@@ -13,7 +13,7 @@ class LoadVideo(LoadSample):
         super().__init__()
 
         self.stride = stride
-
+        path = os.path.abspath(path)
         if path.split('.')[-1].lower() not in VID_FORMATS:
             raise FileNotFoundError(f"File ext is invalid: {path}")
 

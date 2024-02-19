@@ -43,7 +43,7 @@ if __name__ == "__main__":
     from utils.logger import get_logger, init_logger
 
     from core.obj_detectors import ObjectDetector
-    from utils.medialoader import MediaLoader
+    from core.medialoader import MediaLoader
     from core.bbox import BBox
 
     update_config(cfg, args='./configs/config.yaml')

@@ -100,7 +100,7 @@ class ObjectDetector(object):
 
 if __name__ == "__main__":
     import cv2
-    from utils.medialoader import MediaLoader
+    from core.medialoader import MediaLoader
     from utils.logger import init_logger
     from utils.config import set_config, get_config
 

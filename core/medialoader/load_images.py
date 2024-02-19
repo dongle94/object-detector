@@ -20,7 +20,7 @@ class LoadImages(LoadSample):
             elif os.path.isfile(p):
                 files.append(p)
             else:
-                FileNotFoundError(f'{p} does not exist')
+                raise FileNotFoundError(f'{p} does not exist')
 
         images = [x for x in files if x.split('.')[-1].lower() in IMG_FORMATS]
         ni = len(images)

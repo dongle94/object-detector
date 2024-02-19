@@ -55,11 +55,9 @@ class LoadStream(LoadSample):
             time.sleep(0.0)  # wait time
 
     def __iter__(self):
-        self.count = -1
         return self
 
     def __next__(self):
-        self.count += 1
         if not self.thread.is_alive() or cv2.waitKey(1) == ord('q'):
             cv2.destroyAllWindows()
             raise StopIteration

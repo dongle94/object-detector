@@ -28,6 +28,7 @@ class LoadImages(LoadSample):
         self.mode = 'image'
         self.files = images
         self.num_files = ni
+        self.count = 0
 
     def __iter__(self):
         self.count = 0

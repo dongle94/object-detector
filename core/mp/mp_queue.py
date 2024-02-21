@@ -1,10 +1,8 @@
 import queue
 from multiprocessing import Queue, Lock
 
-import time
 
 class MessageQueue(object):
-
     def __init__(self, q_size=0):
         self.queue = Queue(maxsize=q_size)
         self.max_size = q_size
@@ -20,31 +18,26 @@ class MessageQueue(object):
                 except queue.Full:
                     if discard is True:
                         # ignore data
-                        print("큐가 꽉차서 버립니다.", data)
                         return
                     else:   # replace
-                        print("큐 대체 시작", self.queue.full())
-                        t = time.time()
                         _tmp = list()
                         while not self.queue.empty():
                             d = self.queue.get()
-                            print(f"뺐다 {d}")
                             _tmp.append(d)
-                        print("대체 전", _tmp)
                         _tmp[-1] = data
-                        print("대체 후", _tmp)
                         while len(_tmp) != 0:
                             d = _tmp.pop(0)
-                            print(f"넣는다 {d}")
                             self.queue.put(d)
-                        print(f"큐가 꽉차서 대체합니다. {time.time()-t:.5f}")
 
-    def get(self, block=True, timeout=1):
+    def get(self, block=True, timeout=1, default=None):
         """
         if block is False, timeout ignore
         """
         with self.lock:
-            data = self.queue.get(block=block, timeout=timeout)
+            if self.queue.empty() is False:
+                data = self.queue.get(block=block, timeout=timeout)
+            else:
+                data = default
 
         return data
 

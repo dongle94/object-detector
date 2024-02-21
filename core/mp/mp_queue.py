@@ -8,7 +8,7 @@ class MessageQueue(object):
         self.max_size = q_size
         self.lock = Lock()
 
-    def put(self, data, block=True, to=None, discard=True):
+    def put(self, data, block=True, to=1, discard=True):
         with self.lock:
             if self.max_size == 0:
                 self.queue.put(data, block, to)

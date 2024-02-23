@@ -1,6 +1,7 @@
 import signal
+import queue
+import time
 import multiprocessing as mp
-from multiprocessing import Queue, Process
 
 from core.mp.mp_queue import MessageQueue
 
@@ -20,80 +21,123 @@ class Job(object):
         pass
 
 
-# class Task(object):
-#     def __init__(self, job=None, pool_size=1, use_default_queue=True):
-#         if use_default_queue:
-#             self.input_queue = MessageQueue(q_size=1)
-#             self.output_queue = MessageQueue(q_size=1)
-#         else:
-#             self.input_queue = None
-#             self.output_queue = None
-#         self.job = job
-#         self.output_timeout = 5
-#
-#         self._is_started = False
-#         self._is_initialized = False
-#         self._need_finish = False
-#
-#     def init(self):
-#         if self._is_initialized:
-#             return
-#         self._is_initialized = True
-#
-#         # self.pool = thread_util.ThreadPool(self.pool_size)
-#         if self.job:
-#             try:
-#                 self.job.init()
-#             except Exception as e:
-#                 msg = e.message if hasattr(e, 'message') else e
-#                 print(f"Failed initializing job {self}, {msg}")
-#                 raise e
-#
-#         signal.signal(signal.SIGTERM, self._stop_signal)
-#
-#     def start(self):
-#         if self._is_started:
-#             return
-#         self._is_started = True
-#         self.init()
-#         self.work_loop()
-#
-#     def stop(self):
-#         self._need_finish = True
-#         self.job.close()
-#         if self.input_queue:
-#             self.input_queue.close()
-#         if self.output_queue:
-#             self.output_queue.close()
-#
-#     def _stop_signal(self):
-#         self._need_finish = True
-#
-#     def work_loop(self):
-#         print(f"Started {self}")
-#         self._is_started = True
-#         self.init()
-#
-#         try:
-#             pass
-#         except Exception as e:
-#             print(f"Exception in _work_loop: {e}")
-#
-#         self.stop()
-#         print(f"Finished {self}")
-#
-#     def _process(self, item):
-#         result = self.job.process(item)
-#         self._process_result(result, self.output_queue)
-#
-#     def _process_result(self, res, output_queue):
-#         if output_queue is None or res is None:
-#             return
-#         while output_queue and self._need_finish is False:
-#             try:
-#                 output_queue.put(res, block=True, timeout=self.output_timeout)
-#             except:
-#                 pass
+class Task(object):
+    def __init__(self, job=None, use_default_queues=True, empty_input_task=False):
+        if use_default_queues:
+            self.input_queues = [MessageQueue(q_size=1)]
+            self.output_queues = [MessageQueue(q_size=1)]
+        else:
+            self.input_queues = None
+            self.output_queues = None
+
+        self.job = job
+        self.output_timeout = 1
+
+        self._is_started = False
+        self._is_initialized = False
+        self._need_finish = False
+
+        self.empty_input_task = empty_input_task
+
+    def set_queues(self, input_queues=None, output_queues=None):
+        if input_queues is not None:
+            self.input_queues = input_queues if isinstance(input_queues, (list, tuple)) else [input_queues]
+        if output_queues is not None:
+            self.output_queues = output_queues if isinstance(output_queues, (list, tuple)) else [output_queues]
+
+    @property
+    def job(self):
+        return self._job
+
+    @job.setter
+    def job(self, job):
+        self._job = job
+
+    def initialize(self):
+        if self._is_initialized:
+            return
+        self._is_initialized = True
+
+        # self.pool = thread_util.ThreadPool(self.pool_size)
+        if self.job:
+            try:
+                self.job.init()
+            except Exception as e:
+                msg = e.message if hasattr(e, 'message') else e
+                print(f"Failed initializing job {self}, {msg}")
+                raise e
+
+        signal.signal(signal.SIGTERM, self._stop_signal)
+
+    def start(self):
+        if self._is_started:
+            return
+        self._is_started = True
+        self.initialize()
+        self.work_loop()
+
+    def stop(self):
+        self._need_finish = True
+        self.job.close()
+        if self.input_queues:
+            for q in self.input_queues:
+                q.close()
+        if self.output_queues:
+            for q in self.output_queues:
+                q.close()
+
+    def _stop_signal(self, signum, frame):
+        self._need_finish = True
+
+    def work_loop(self):
+        print(f"Started {self}")
+        self._is_started = True
+        self.initialize()
+
+        try:
+            while self._need_finish is False:
+                try:
+                    item = self.input_queues[0].get(block=True, timeout=0.01)
+                except queue.Empty:
+                    if self.empty_input_task is True:
+                        item = None
+                    else:
+                        time.sleep(0.01)
+                        continue
+
+                self._process(item)
+                # while self._need_finish is False:
+                #     try:
+                #         self._process(item)     # multithreading execute
+                #         break
+                #     except thread.Empty:
+                #         time.sleep(0.01)
+                #         continue
+        except KeyboardInterrupt:
+            print("KeyboardInterrupt")
+        except Exception as e:
+            print(f"Exception in _work_loop: {e}")
+
+        self.stop()
+        print(f"Finished {self}")
+
+    def _process(self, item):
+        result = self.job.process(item)
+        if result is None or self.output_queues is None:
+            return
+        new_input = result
+        self._process_result(new_input, self.output_queues[0])
+
+    def _process_result(self, res, output_queue):
+        if output_queue is None or res is None:
+            return
+        while output_queue and self._need_finish is False:
+            try:
+                output_queue.put(res, block=True, timeout=self.output_timeout)
+                break
+            except queue.Full:
+                time.sleep(0.01)
+                continue
 
 
 class TaskLauncher(object):

@@ -1,4 +1,5 @@
 import signal
+import multiprocessing as mp
 from multiprocessing import Queue, Process
 
 from core.mp.mp_queue import MessageQueue
@@ -14,9 +15,6 @@ class Job(object):
     def process(self, data):
         print(f"{self.name}: {data}!")
         return data
-
-    def __repr__(self):
-        return f"{self.name}"
 
     def close(self):
         pass
@@ -109,20 +107,33 @@ class TaskLauncher(object):
         self.task.stop()
 
 
-
 class MPTaskLauncher(TaskLauncher):
-    def __init__(self, worker):
-        super().__init__(worker)
+    def __init__(self, task, proc_init_func=None, proc_init_args=None):
+        super().__init__(task)
+        ctx = mp.get_context('spawn')
 
+        self.bg_process = ctx.Process(
+            name=task.job.name,
+            target=self._process_start
+        )
 
-        self.name
-        self.input_queue
-        self.output_queue
+        self.proc_init_func = proc_init_func
+        self.proc_init_args = proc_init_args
 
+    def start(self):
+        self.bg_process.start()
 
+    def _process_start(self):
+        if self.proc_init_func:
+            self.proc_init_func(*self.proc_init_args)
+        self.task.start()
 
-    def run(self):
-        print(self.name)
+    def stop(self):
+        self.task.stop()
+        if self.bg_process:
+            if self.bg_process.is_alive():
+                self.bg_process.join(1.0)
+                self.bg_process.terminate()
 
 
 class TaskManager(object):
@@ -147,3 +158,7 @@ class TaskManager(object):
             t.stop()
 
         self.task_list = []
+
+    def __del__(self):
+        if self.task_list:
+            self.stop()

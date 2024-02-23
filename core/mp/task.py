@@ -99,6 +99,33 @@ class Job(object):
 
 
 class TaskLauncher(object):
+    def __init__(self, task):
+        self.task = task
+
+    def start(self):
+        self.task.start()
+
+    def stop(self):
+        self.task.stop()
+
+
+
+class MPTaskLauncher(TaskLauncher):
+    def __init__(self, worker):
+        super().__init__(worker)
+
+
+        self.name
+        self.input_queue
+        self.output_queue
+
+
+
+    def run(self):
+        print(self.name)
+
+
+class TaskManager(object):
     def __init__(self):
         self.task_list = []
 
@@ -120,18 +147,3 @@ class TaskLauncher(object):
             t.stop()
 
         self.task_list = []
-
-
-# class MPTaskLauncher(Process):
-#     def __init__(self, ):
-#         super().__init__()
-#
-#
-#         self.name
-#         self.input_queue
-#         self.output_queue
-#
-#
-#
-#     def run(self):
-#         print(self.name)

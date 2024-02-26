@@ -202,6 +202,12 @@ if __name__ == "__main__":
 
     t = 0
     while True:
-        print(f"시작 한지: {t}초")
-        t += 10
-        time.sleep(10)
+        try:
+            print(f"시작 한지: {t}초")
+            t += 10
+            time.sleep(10)
+        except KeyboardInterrupt:
+            print("키보드 인터럽트")
+            break
+
+    task_manager.stop()

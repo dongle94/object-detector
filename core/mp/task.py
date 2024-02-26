@@ -8,8 +8,8 @@ from core.mp.mp_queue import MessageQueue
 
 
 class Job(object):
-    def __init__(self):
-        self.name = self.__class__.__name__
+    def __init__(self, i=0):
+        self.name = self.__class__.__name__ + f'-{i}'
 
     def init(self):
         pass

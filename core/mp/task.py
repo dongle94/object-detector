@@ -1,3 +1,4 @@
+import os
 import signal
 import queue
 import time
@@ -37,6 +38,7 @@ class Task(object):
         self._is_initialized = False
         self._need_finish = False
 
+        self.lock = mp.Lock()
         self.empty_input_task = empty_input_task
 
     def set_queues(self, input_queues=None, output_queues=None):
@@ -90,29 +92,24 @@ class Task(object):
         self._need_finish = True
 
     def work_loop(self):
-        print(f"Started {self}")
+        print(f"Started {self.__str__()}")
         self._is_started = True
         self.initialize()
 
         try:
             while self._need_finish is False:
-                try:
-                    item = self.input_queues[0].get(block=True, timeout=0.01)
-                except queue.Empty:
-                    if self.empty_input_task is True:
-                        item = None
-                    else:
-                        time.sleep(0.01)
+                if self.empty_input_task is True:
+                    item = None
+                    time.sleep(0.001)
+                else:
+                    try:
+                        with self.lock:
+                            item = self.input_queues[0].get(block=True, timeout=0.01)
+                    except queue.Empty:
+                        time.sleep(0.001)
                         continue
 
                 self._process(item)
-                # while self._need_finish is False:
-                #     try:
-                #         self._process(item)     # multithreading execute
-                #         break
-                #     except thread.Empty:
-                #         time.sleep(0.01)
-                #         continue
         except KeyboardInterrupt:
             print("KeyboardInterrupt")
         except Exception as e:
@@ -133,11 +130,15 @@ class Task(object):
             return
         while output_queue and self._need_finish is False:
             try:
-                output_queue.put(res, block=True, timeout=self.output_timeout)
+                with self.lock:
+                    output_queue.put(res, block=True, timeout=self.output_timeout)
                 break
             except queue.Full:
-                time.sleep(0.01)
+                time.sleep(0.001)
                 continue
+
+    def __str__(self):
+        return f'Worker(job={self.job.name}, {os.getpid()})'
 
 
 class TaskLauncher(object):
@@ -160,6 +161,7 @@ class MPTaskLauncher(TaskLauncher):
             name=task.job.name,
             target=self._process_start
         )
+        self.bg_process.daemon = True
 
         self.proc_init_func = proc_init_func
         self.proc_init_args = proc_init_args

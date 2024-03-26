@@ -31,7 +31,7 @@ def set_config(file):
     config.det_model_path = _config['DET']['DET_MODEL_PATH']
     config.det_half = _config['DET']['HALF']
     config.det_conf_thres = _config['DET']['CONF_THRES']
-    config.det_obj_classes = _config['DET']['OBJ_CLASSES']
+    config.det_obj_classes = eval(str(_config['DET']['OBJ_CLASSES']))
 
     # YOLOV5
     config.yolov5_img_size = _config['YOLOV5']['IMG_SIZE']

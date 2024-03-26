@@ -1,6 +1,5 @@
 import os
 import sys
-import time
 from pathlib import Path
 
 FILE = Path(__file__).resolve()
@@ -13,7 +12,7 @@ from utils.logger import get_logger
 
 class ObjectDetector(object):
     def __init__(self, cfg=None):
-        self.logger = get_logger(cfg.logger_name)
+        self.logger = get_logger()
         self.cfg = cfg
 
         weight = os.path.abspath(cfg.det_model_path)
@@ -123,7 +122,7 @@ if __name__ == "__main__":
     _detector = ObjectDetector(cfg=_cfg)
 
     s = sys.argv[1]
-    media_loader = MediaLoader(s, realtime=False)
+    media_loader = MediaLoader(s, realtime=False, opt=_cfg)
 
     while True:
         frame = media_loader.get_frame()

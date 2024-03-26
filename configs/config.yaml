@@ -5,23 +5,25 @@ ENV:
 
 # Media
 MEDIA:
-  SOURCE: "0"
+  SOURCE: 0
   OPT_AUTO: True
-  FOURCC: "mp4v"
+  FOURCC: "MJPG"
   WIDTH: 1280
   HEIGHT: 720
   FPS: 30
+  REALTIME: False
+  BGR: True
 
 # Object Detector
 DET:
   MODEL_TYPE: yolov5
-  DET_MODEL_PATH: './weights/yolov5s6.onnx'
-  HALF: True
-  CONF_THRES: 0.25
+  DET_MODEL_PATH: './weights/yolov5m.pt'
+  HALF: False
+  CONF_THRES: 0.5
   OBJ_CLASSES: [0]
 
 YOLOV5:
-  IMG_SIZE: 1280
+  IMG_SIZE: 640
   NMS_IOU: 0.45
   AGNOSTIC_NMS: True
   MAX_DET: 100

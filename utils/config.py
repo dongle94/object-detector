@@ -23,6 +23,8 @@ def set_config(file):
     config.media_width = _config['MEDIA']['WIDTH']
     config.media_height = _config['MEDIA']['HEIGHT']
     config.media_fps = _config['MEDIA']['FPS']
+    config.media_realtime = _config['MEDIA']['REALTIME']
+    config.media_bgr = _config['MEDIA']['BGR']
 
     # Det
     config.det_model_type = _config['DET']['MODEL_TYPE']

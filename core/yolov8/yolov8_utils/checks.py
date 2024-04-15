@@ -21,30 +21,32 @@ import requests
 import torch
 from matplotlib import font_manager
 
-from core.yolov8.utils import (
-    ASSETS,
-    AUTOINSTALL,
-    LINUX,
-    LOGGER,
-    ONLINE,
-    ROOT,
-    USER_CONFIG_DIR,
-    SimpleNamespace,
-    ThreadingLocked,
-    TryExcept,
-    clean_url,
-    colorstr,
-    downloads,
-    emojis,
-    is_colab,
-    is_docker,
-    is_github_action_running,
-    is_jupyter,
-    is_kaggle,
-    is_online,
-    is_pip_package,
-    url2file,
-)
+from core.yolov8.yolov8_utils import emojis
+
+# from core.yolov8.utils import (
+#     ASSETS,
+#     AUTOINSTALL,
+#     LINUX,
+#     LOGGER,
+#     ONLINE,
+#     ROOT,
+#     USER_CONFIG_DIR,
+#     SimpleNamespace,
+#     ThreadingLocked,
+#     TryExcept,
+#     clean_url,
+#     colorstr,
+#     downloads,
+#     emojis,
+#     is_colab,
+#     is_docker,
+#     is_github_action_running,
+#     is_jupyter,
+#     is_kaggle,
+#     is_online,
+#     is_pip_package,
+#     url2file,
+# )
 
 
 # def parse_requirements(file_path=ROOT.parent / "requirements.txt", package=""):
@@ -97,7 +99,7 @@ def parse_version(version="0.0.0") -> tuple:
     try:
         return tuple(map(int, re.findall(r"\d+", version)[:3]))  # '2.0.1+cpu' -> (2, 0, 1)
     except Exception as e:
-        LOGGER.warning(f"WARNING ⚠️ failure for parse_version({version}), returning (0, 0, 0): {e}")
+        print(f"WARNING ⚠️ failure for parse_version({version}), returning (0, 0, 0): {e}")
         return 0, 0, 0
 
 
@@ -208,7 +210,7 @@ def check_version(
         ```
     """
     if not current:  # if current is '' or None
-        LOGGER.warning(f"WARNING ⚠️ invalid check_version({current}, {required}) requested, please check values.")
+        print(f"WARNING ⚠️ invalid check_version({current}, {required}) requested, please check values.")
         return True
     elif not current[0].isdigit():  # current is package name rather than version string, i.e. current='ultralytics'
         try:
@@ -247,7 +249,7 @@ def check_version(
         if hard:
             raise ModuleNotFoundError(emojis(warning))  # assert version requirements met
         if verbose:
-            LOGGER.warning(warning)
+            print(warning)
     return result
 
 
@@ -434,34 +436,34 @@ def check_version(
 #             )
 
 
-# def check_suffix(file="yolov8n.pt", suffix=".pt", msg=""):
-#     """Check file(s) for acceptable suffix."""
-#     if file and suffix:
-#         if isinstance(suffix, str):
-#             suffix = (suffix,)
-#         for f in file if isinstance(file, (list, tuple)) else [file]:
-#             s = Path(f).suffix.lower().strip()  # file suffix
-#             if len(s):
-#                 assert s in suffix, f"{msg}{f} acceptable suffix is {suffix}, not {s}"
+def check_suffix(file="yolov8n.pt", suffix=".pt", msg=""):
+    """Check file(s) for acceptable suffix."""
+    if file and suffix:
+        if isinstance(suffix, str):
+            suffix = (suffix,)
+        for f in file if isinstance(file, (list, tuple)) else [file]:
+            s = Path(f).suffix.lower().strip()  # file suffix
+            if len(s):
+                assert s in suffix, f"{msg}{f} acceptable suffix is {suffix}, not {s}"
 
 
-# def check_yolov5u_filename(file: str, verbose: bool = True):
-#     """Replace legacy YOLOv5 filenames with updated YOLOv5u filenames."""
-#     if "yolov3" in file or "yolov5" in file:
-#         if "u.yaml" in file:
-#             file = file.replace("u.yaml", ".yaml")  # i.e. yolov5nu.yaml -> yolov5n.yaml
-#         elif ".pt" in file and "u" not in file:
-#             original_file = file
-#             file = re.sub(r"(.*yolov5([nsmlx]))\.pt", "\\1u.pt", file)  # i.e. yolov5n.pt -> yolov5nu.pt
-#             file = re.sub(r"(.*yolov5([nsmlx])6)\.pt", "\\1u.pt", file)  # i.e. yolov5n6.pt -> yolov5n6u.pt
-#             file = re.sub(r"(.*yolov3(|-tiny|-spp))\.pt", "\\1u.pt", file)  # i.e. yolov3-spp.pt -> yolov3-sppu.pt
-#             if file != original_file and verbose:
-#                 LOGGER.info(
-#                     f"PRO TIP 💡 Replace 'model={original_file}' with new 'model={file}'.\nYOLOv5 'u' models are "
-#                     f"trained with https://github.com/ultralytics/ultralytics and feature improved performance vs "
-#                     f"standard YOLOv5 models trained with https://github.com/ultralytics/yolov5.\n"
-#                 )
-#     return file
+def check_yolov5u_filename(file: str, verbose: bool = True):
+    """Replace legacy YOLOv5 filenames with updated YOLOv5u filenames."""
+    if "yolov3" in file or "yolov5" in file:
+        if "u.yaml" in file:
+            file = file.replace("u.yaml", ".yaml")  # i.e. yolov5nu.yaml -> yolov5n.yaml
+        elif ".pt" in file and "u" not in file:
+            original_file = file
+            file = re.sub(r"(.*yolov5([nsmlx]))\.pt", "\\1u.pt", file)  # i.e. yolov5n.pt -> yolov5nu.pt
+            file = re.sub(r"(.*yolov5([nsmlx])6)\.pt", "\\1u.pt", file)  # i.e. yolov5n6.pt -> yolov5n6u.pt
+            file = re.sub(r"(.*yolov3(|-tiny|-spp))\.pt", "\\1u.pt", file)  # i.e. yolov3-spp.pt -> yolov3-sppu.pt
+            if file != original_file and verbose:
+                print(
+                    f"PRO TIP 💡 Replace 'model={original_file}' with new 'model={file}'.\nYOLOv5 'u' models are "
+                    f"trained with https://github.com/ultralytics/ultralytics and feature improved performance vs "
+                    f"standard YOLOv5 models trained with https://github.com/ultralytics/yolov5.\n"
+                )
+    return file
 
 
 # def check_model_file_from_stem(model="yolov8n"):

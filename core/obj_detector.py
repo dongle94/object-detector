@@ -26,26 +26,37 @@ class ObjectDetector(object):
 
         self.framework = None
 
-        if self.detector_type == "yolov5":
+        if self.detector_type in ["yolov5", "yolov8"]:
             img_size = cfg.yolov5_img_size
             iou_thres = cfg.yolov5_nms_iou
             agnostic = cfg.yolov5_agnostic_nms
             max_det = cfg.yolov5_max_det
             self.im_shape = None
             self.im0_shape = None
-
-            # model load with weight
-            ext = os.path.splitext(weight)[1]
-            if ext in ['.pt', '.pth']:
-                from core.yolov5.yolov5_pt import Yolov5Torch
-                model = Yolov5Torch
-                self.framework = 'torch'
-            elif ext == '.onnx':
-                from core.yolov5.yolov5_ort import Yolov5ORT
-                model = Yolov5ORT
-                self.framework = 'onnx'
+            if self.detector_type == "yolov5":
+                # model load with weight
+                ext = os.path.splitext(weight)[1]
+                if ext in ['.pt', '.pth']:
+                    from core.yolov5.yolov5_pt import Yolov5Torch
+                    model = Yolov5Torch
+                    self.framework = 'torch'
+                elif ext == '.onnx':
+                    from core.yolov5.yolov5_ort import Yolov5ORT
+                    model = Yolov5ORT
+                    self.framework = 'onnx'
+                else:
+                    raise FileNotFoundError('No Yolov5 weight File!')
+            elif self.detector_type == "yolov8":
+                # model load with weight
+                ext = os.path.splitext(weight)[1]
+                if ext in ['.pt', '.pth']:
+                    from core.yolov8.yolov8_pt import Yolov8Torch
+                    model = Yolov8Torch
+                    self.framework = 'torch'
+                else:
+                    raise FileNotFoundError('No Yolov8 weight File!')
             else:
-                raise FileNotFoundError('No Yolov5 weight File!')
+                raise NotImplementedError(f'Unknown detector type: {self.detector_type}')
             self.detector = model(
                 weight=weight,
                 device=device,
@@ -61,15 +72,15 @@ class ObjectDetector(object):
             self.names = self.detector.names
 
             # warm up
-            self.detector.warmup(imgsz=(1, 3, img_size, img_size))
+            self.detector.warmup(img_size=(1, 3, img_size, img_size))
             self.logger.info(f"Successfully loaded weight from {weight}")
 
-            # logging
-            self.f_cnt = 0
-            self.ts = [0., 0., 0.]
+        # logging
+        self.f_cnt = 0
+        self.ts = [0., 0., 0.]
 
     def run(self, img):
-        if self.detector_type == "yolov5":
+        if self.detector_type in ["yolov5", "yolov8"]:
             t0 = self.detector.get_time()
 
             img, orig_img = self.detector.preprocess(img)

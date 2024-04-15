@@ -3,9 +3,8 @@
 __version__ = "8.1.0"
 
 import time
-# from core.yolov8.models import YOLOV8
 
-__all__ = "__version__", "YOLOv8", #"YOLOV8"
+__all__ = "__version__", "YOLOv8"
 
 
 class YOLOv8(object):

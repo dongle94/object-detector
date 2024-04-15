@@ -2,9 +2,21 @@
 Object Detection based Project
 
 
+## Installation
+- python 3.8.x
+- recommend conda envs
 
+```shell
+$ pip install -r ./requirements.txt 
+```
 
-
+## Modules
+- medialoader
+- detectors
+  - yolov5
+  - yolov8
+- object_tracker
+  - osnet
 
 ## Tools
 ### Human head mosaic

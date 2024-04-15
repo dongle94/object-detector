@@ -40,6 +40,7 @@ def set_config(file):
     config.yolov5_max_det = _config['YOLOV5']['MAX_DET']
 
     # YOLOV8
+    config.yolov8_img_size = _config['YOLOV8']['IMG_SIZE']
     config.yolov8_nms_iou = _config['YOLOV8']['NMS_IOU']
     config.yolov8_agnostic_nms = _config['YOLOV8']['AGNOSTIC_NMS']
     config.yolov8_max_det = _config['YOLOV8']['MAX_DET']

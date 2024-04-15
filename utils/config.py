@@ -39,6 +39,11 @@ def set_config(file):
     config.yolov5_agnostic_nms = _config['YOLOV5']['AGNOSTIC_NMS']
     config.yolov5_max_det = _config['YOLOV5']['MAX_DET']
 
+    # YOLOV8
+    config.yolov8_nms_iou = _config['YOLOV8']['NMS_IOU']
+    config.yolov8_agnostic_nms = _config['YOLOV8']['AGNOSTIC_NMS']
+    config.yolov8_max_det = _config['YOLOV8']['MAX_DET']
+
     # TRACKER
     config.track_use_encoder = _config['TRACK']['TRACK_USE_ENCODER']
     config.track_model_type = _config['TRACK']['TRACK_MODEL_TYPE']

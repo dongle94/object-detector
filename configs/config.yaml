@@ -28,6 +28,12 @@ YOLOV5:
   AGNOSTIC_NMS: True
   MAX_DET: 100
 
+YOLOV8:
+  NMS_IOU: 0.45
+  AGNOSTIC_NMS: False
+  MAX_DET: 100
+
+
 # Object Tracker
 TRACK:
   TRACK_USE_ENCODER: false

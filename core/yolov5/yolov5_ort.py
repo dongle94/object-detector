@@ -79,8 +79,8 @@ class Yolov5ORT(YOLOV5):
         self.agnostic = agnostic
         self.max_det = max_det
 
-    def warmup(self, imgsz=(1, 3, 640, 640)):
-        im = np.zeros(imgsz, dtype=np.float16 if self.fp16 else np.float32)
+    def warmup(self, img_size=(1, 3, 640, 640)):
+        im = np.zeros(img_size, dtype=np.float16 if self.fp16 else np.float32)
         if self.device == 'cuda':
             im_ortval = ort.OrtValue.ortvalue_from_numpy(im, 'cuda', self.gpu_num)
             element_type = np.float16 if self.fp16 else np.float32

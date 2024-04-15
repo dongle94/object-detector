@@ -46,8 +46,8 @@ class Yolov5Torch(YOLOV5):
         self.agnostic = agnostic
         self.max_det = max_det
 
-    def warmup(self, imgsz=(1, 3, 640, 640)):
-        im = torch.empty(*imgsz, dtype=torch.half if self.fp16 else torch.float, device=self.device)
+    def warmup(self, img_size=(1, 3, 640, 640)):
+        im = torch.empty(*img_size, dtype=torch.half if self.fp16 else torch.float, device=self.device)
         t = time.time()
         self.infer(im)  # warmup
         print(f"-- Yolov5 Detector warmup: {time.time()-t:.6f} sec --")

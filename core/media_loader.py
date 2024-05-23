@@ -1,9 +1,6 @@
 import os
 import cv2
-import math
-import numpy as np
 from pathlib import Path
-import time
 
 from core.medialoader import load_images, load_video, load_stream
 
@@ -42,7 +39,7 @@ class MediaLoader(object):
         elif self.is_vid:
             dataset = load_video.LoadVideo(source, stride=self.stride, realtime=self.realtime, bgr=self.bgr)
         elif self.is_stream:
-            dataset = load_stream.LoadStream(source, stride=self.stride, opt=self.opt, bgr=self.bgr)
+            dataset = load_stream.LoadStream(source, stride=self.stride, opt=self.opt, bgr=self.bgr, logger=logger)
         else:
             raise NotImplementedError(f'Invalid input: {source}')
 

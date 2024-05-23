@@ -302,8 +302,8 @@ class SettingsManager(dict):
         import copy
         import hashlib
 
-        from ultralytics.utils.checks import check_version
-        from ultralytics.utils.torch_utils import torch_distributed_zero_first
+        from .checks import check_version
+        from .torch_utils import torch_distributed_zero_first
 
         git_dir = get_git_dir()
         root = git_dir or Path()

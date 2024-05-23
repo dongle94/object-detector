@@ -1,12 +1,25 @@
 import os
 import platform
 import torch
+import torch.distributed as dist
+from contextlib import contextmanager
 
 from core.yolov8 import __version__
 from core.yolov8.yolov8_utils.checks import check_version
 
 
 TORCH_2_0 = check_version(torch.__version__, "2.0.0")
+
+
+@contextmanager
+def torch_distributed_zero_first(local_rank: int):
+    """Decorator to make all processes in distributed training wait for each local_master to do something."""
+    initialized = torch.distributed.is_available() and torch.distributed.is_initialized()
+    if initialized and local_rank not in (-1, 0):
+        dist.barrier(device_ids=[local_rank])
+    yield
+    if initialized and local_rank == 0:
+        dist.barrier(device_ids=[0])
 
 
 def select_device(device="", gpu_num=0):

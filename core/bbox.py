@@ -1,6 +1,7 @@
 import time
 import numpy as np
 
+
 class BBox(object):
     def __init__(self, tlbr=None, tlwh=None, rel=False, class_index=-1, class_name="", conf=0., imgsz=None):
         self.class_idx = class_index

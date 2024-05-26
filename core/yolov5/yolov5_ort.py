@@ -23,7 +23,7 @@ class Yolov5ORT(YOLOV5):
     def __init__(self, weight: str, device: str = "cpu", img_size: int = 640, fp16: bool = False, auto: bool = False,
                  gpu_num: int = 0, conf_thres=0.25, iou_thres=0.45, agnostic=False, max_det=100,
                  classes: Union[list, None] = None):
-        super().__init__()
+        super(Yolov5ORT, self).__init__()
         self.img_size = img_size
         self.auto = auto
         self.device = device
@@ -41,23 +41,23 @@ class Yolov5ORT(YOLOV5):
             )
             providers.insert(0, cuda_provider)
 
-        if self.fp16:
-            weight_dir = os.path.dirname(weight)
-            weight_name, weight_ext = os.path.splitext(os.path.basename(weight))
-            half_model = os.path.join(weight_dir, f"{weight_name}-fp16{weight_ext}")
-            if not os.path.exists(half_model):
-                import onnx
-                model = onnx.load(weight)
-                model_fp16 = float16.convert_float_to_float16(
-                    model=model,
-                    min_positive_val=float('-inf'),
-                    max_finite_val=float('inf'),
-                    keep_io_types=False
-                )
-                onnx.save(model_fp16, half_model)
-                print("Onnx model convert fp16 model.")
-            weight = half_model
-            print("Onnx model get fp16.")
+        # if self.fp16:
+            # weight_dir = os.path.dirname(weight)
+            # weight_name, weight_ext = os.path.splitext(os.path.basename(weight))
+            # half_model = os.path.join(weight_dir, f"{weight_name}-fp16{weight_ext}")
+            # if not os.path.exists(half_model):
+            #     import onnx
+            #     model = onnx.load(weight)
+            #     model_fp16 = float16.convert_float_to_float16(
+            #         model=model,
+            #         min_positive_val=float('-inf'),
+            #         max_finite_val=float('inf'),
+            #         keep_io_types=False
+            #     )
+            #     onnx.save(model_fp16, half_model)
+            #     print("Onnx model convert fp16 model.")
+            # weight = half_model
+            # print("Onnx model get fp16.")
         self.sess = ort.InferenceSession(weight, providers=providers)
         self.io_binding = self.sess.io_binding()
         if device == 'cuda':
@@ -88,9 +88,9 @@ class Yolov5ORT(YOLOV5):
                 name='images', device_type=im_ortval.device_name(), device_id=self.gpu_num, element_type=element_type,
                 shape=im_ortval.shape(), buffer_ptr=im_ortval.data_ptr())
 
-        t = time.time()
+        t = self.get_time()
         self.infer(im)
-        print(f"-- Yolov5 Onnx Detector warmup: {time.time()-t:.6f} sec --")
+        print(f"-- Yolov5 Onnx Detector warmup: {self.get_time()-t:.6f} sec --")
 
     def preprocess(self, img: np.ndarray):
         im = letterbox(img, new_shape=self.img_size, auto=self.auto, stride=self.stride)[0]  # padded resize
@@ -132,6 +132,9 @@ class Yolov5ORT(YOLOV5):
 
         return pred, det
 
+    def get_time(self):
+        return time.time()
+
 
 if __name__ == "__main__":
     import cv2
@@ -145,7 +148,7 @@ if __name__ == "__main__":
         gpu_num=cfg.gpu_num, conf_thres=cfg.det_conf_thres, iou_thres=cfg.yolov5_nms_iou,
         agnostic=cfg.yolov5_agnostic_nms, max_det=cfg.yolov5_max_det, classes=cfg.det_obj_classes
     )
-    yolov5.warmup(imgsz=(1, 3, cfg.yolov5_img_size, cfg.yolov5_img_size))
+    yolov5.warmup()
 
     _im = cv2.imread('./data/images/sample.jpg')
     t0 = yolov5.get_time()

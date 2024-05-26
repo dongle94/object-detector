@@ -22,7 +22,7 @@ def convert(opt):
     file = Path(opt.weight)
 
     # Device and Half Check
-    device = select_device(opt.device, gpu_num=opt.gpu_num)
+    device = select_device(device=opt.device, gpu_num=opt.gpu_num)
     fp16 = opt.fp16
     if fp16:
         assert device.type != 'cpu', '--half only compatible with GPU export, i.e. use --device cuda'
@@ -45,14 +45,18 @@ def convert(opt):
     y = None
     for _ in range(2):
         y = model(im)  # dry runs
+
+    data_format = 'fp32'
     if fp16:
         print("Apply half: --fp16")
         im, model = im.half(), model.half()
+        data_format = 'fp16'
     shape = tuple((y[0] if isinstance(y, tuple) else y).shape)
     print(f"Converting from {file} with output shape {shape}")
 
     #f[2], _ = export_onnx(model, im, file, opset, dynamic, simplify)
     f = str(file.with_suffix('.onnx'))
+    f = os.path.splitext(f)[0] + f"-{data_format}" + os.path.splitext(f)[1]
     output_names = ['output0']
 
     torch.onnx.export(
@@ -76,6 +80,8 @@ def convert(opt):
     for k, v in d.items():
         meta = model_onnx.metadata_props.add()
         meta.key, meta.value = k, str(v)
+    onnx.save(model_onnx, f)
+    print(f"Converting and Saving success: {f}")
 
     # Simplify
     if opt.simplify:
@@ -85,7 +91,7 @@ def convert(opt):
             model_onnx, check = onnxsim.simplify(model_onnx)
             assert check, "assert check failed"
             onnx.save(model_onnx, f)
-            print("Converting and Saving success.")
+            print(f"Simplifying and Saving success: {f}")
         except Exception as e:
             print(f"simplifier failure: {e}")
 

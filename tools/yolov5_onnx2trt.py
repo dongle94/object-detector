@@ -42,9 +42,10 @@ def convert(opt):
 
     if builder.platform_has_fast_fp16 and opt.fp16:
         config.set_flag(trt.BuilderFlag.FP16)
-    with builder.build_engine(network, config) as engine, open(f, 'wb') as t:
-        t.write(engine.serialize())
+    with builder.build_serialized_network(network, config) as engine_bytes, open(f, 'wb') as t:
+        t.write(engine_bytes)
     print(f"Converting and Saving success: {f}")
+
 
 def arg_parse():
     parser = argparse.ArgumentParser()

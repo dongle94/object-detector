@@ -44,6 +44,10 @@ class ObjectDetector(object):
                     from core.yolov5.yolov5_ort import Yolov5ORT
                     model = Yolov5ORT
                     self.framework = 'onnx'
+                elif ext in ['.engine', '.bin']:
+                    from core.yolov5.yolov5_trt import Yolov5TRT
+                    model = Yolov5TRT
+                    self.framework = 'trt'
                 else:
                     raise FileNotFoundError('No Yolov5 weight File!')
             elif self.detector_type == "yolov8":

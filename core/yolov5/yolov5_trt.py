@@ -2,14 +2,12 @@ import os
 import sys
 import time
 import copy
-from collections import OrderedDict, namedtuple
-
 import numpy as np
 from typing import Union
 from pathlib import Path
 
+from cuda import cudart
 import tensorrt as trt
-import torch
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[2]
@@ -19,6 +17,7 @@ if str(ROOT) not in sys.path:
 from core.yolov5 import YOLOV5
 from core.yolov5.yolov5_utils.torch_utils import select_device
 from core.yolov5.yolov5_utils.augmentations import letterbox
+from core.yolov5.yolov5_utils.general import non_max_suppression_np, scale_boxes
 
 
 class Yolov5TRT(YOLOV5):
@@ -28,30 +27,45 @@ class Yolov5TRT(YOLOV5):
         super(Yolov5TRT, self).__init__()
         self.device = select_device(device=device, gpu_num=gpu_num)
         self.img_size = img_size
+        self.auto = auto
         self.gpu_num = gpu_num
         self.fp16 = True if fp16 is True else False
 
         self.trt_logger = trt.Logger(trt.Logger.INFO)
+        trt.init_libnvinfer_plugins(self.trt_logger, namespace="")
 
         with open(weight, 'rb') as f, trt.Runtime(self.trt_logger) as runtime:
-            self.model = runtime.deserialize_cuda_engine(f.read())
-        self.context = self.model.create_execution_context()
+            self.engine = runtime.deserialize_cuda_engine(f.read())
+        self.context = self.engine.create_execution_context()
 
-        Binding = namedtuple('Binding', ('name', 'dtype', 'shape', 'data', 'ptr'))
-        self.bindings = OrderedDict()
-        self.output_names = []
-        for i in range(self.model.num_bindings):
-            name = self.model.get_binding_name(i)
-            dtype = trt.nptype(self.model.get_binding_dtype(i))
-            if 'onnx::' in name:
-                continue
-            if not self.model.binding_is_input(i):
-                self.output_names.append(name)
-            shape = tuple(self.context.get_binding_shape(i))
-            im = torch.from_numpy(np.empty(shape, dtype=dtype)).to(device)
-            self.bindings[name] = Binding(name, dtype, shape, im, int(im.data_ptr()))
-        self.binding_addrs = OrderedDict((n, d.ptr) for n, d in self.bindings.items())
-        self.batch_size = self.bindings['images'].shape[0]
+        self.inputs = []
+        self.outputs = []
+        self.allocations = []
+        for i in range(self.engine.num_io_tensors):
+            name = self.engine.get_tensor_name(i)
+            dtype = self.engine.get_tensor_dtype(name)
+            shape = self.engine.get_tensor_shape(name)
+            is_input = False
+            if self.engine.get_tensor_mode(name) == trt.TensorIOMode.INPUT:
+                is_input = True
+            size = np.dtype(trt.nptype(dtype)).itemsize
+            for s in shape:
+                size *= s
+            allocation = cudart.cudaMalloc(size)[1]
+            binding = {
+                'index': i,
+                'name': name,
+                'dtype': np.dtype(trt.nptype(dtype)),
+                'shape': list(shape),
+                'allocation': allocation,
+                'size': size
+            }
+            self.allocations.append(allocation)
+            if is_input:
+                self.inputs.append(binding)
+            else:
+                self.outputs.append(binding)
+        self.names = {i: f'class{i}' for i in range(999)}
 
         # prams for postprocessing
         self.conf_thres = conf_thres
@@ -61,37 +75,67 @@ class Yolov5TRT(YOLOV5):
         self.max_det = max_det
 
     def warmup(self, img_size=(1, 3, 640, 640)):
-        #TODO CHECK
-        im = torch.empty(*img_size, dtype=torch.half if self.fp16 else torch.float, device=self.device)  # input
+        im = np.zeros(img_size, dtype=np.float16 if self.fp16 else np.float32)  # input
         t = self.get_time()
         self.infer(im)  # warmup
         print(f"-- Yolov5 Detector warmup: {self.get_time() - t:.6f} sec --")
 
     def preprocess(self, img):
         # TODO CHECK
-        im = letterbox(img, new_shape=self.img_size, auto=self.auto, stride=self.stride)[0]  # padded resize
+        im = letterbox(img, new_shape=self.img_size, auto=self.auto)[0]  # padded resize
         im = im.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
-        im = np.ascontiguousarray(im)  # contiguous
+        im = np.ascontiguousarray(im).astype(np.float32)  # contiguous
 
-        im = torch.from_numpy(im).to(self.device)
-        im = im.half() if self.fp16 else im.float()  # uint8 to fp16/32
-        im /= 255  # 0 - 255 to 0.0 - 1.0
+        im /= 255.0
+        im = im.astype(np.float16) if self.fp16 else im.astype(np.float32)
         if len(im.shape) == 3:
-            im = torch.unsqueeze(im, dim=0)  # expand for batch dim
+            im = np.expand_dims(im, axis=0)
+
         return im, img
 
     def infer(self, img):
-        self.binding_addrs['images'] = int(img.data_ptr())
-        self.context.execute_v2(list(self.binding_addrs.values()))
-        y = [self.bindings[x].data for x in sorted(self.output_names)]
-        print(y)
-        return y
+        outputs = []
+        for shape, dtype in self.output_spec():
+            outputs.append(np.zeros(shape, dtype))
+
+        device_ptr = self.inputs[0]['allocation']
+        host_arr = img
+        nbytes = host_arr.size * host_arr.itemsize
+        cudart.cudaMemcpy(device_ptr, host_arr.data, nbytes, cudart.cudaMemcpyKind.cudaMemcpyHostToDevice)
+
+        self.context.execute_v2(self.allocations)
+        for o in range(len(outputs)):
+            host_arr = outputs[o]
+            device_ptr = self.outputs[o]['allocation']
+            nbytes = host_arr.size * host_arr.itemsize
+            cudart.cudaMemcpy(host_arr, device_ptr, nbytes, cudart.cudaMemcpyKind.cudaMemcpyDeviceToHost)
+
+        return outputs[0]
 
     def postprocess(self, pred, im_shape, im0_shape):
-        pass
+        pred = non_max_suppression_np(prediction=pred,
+                                      iou_thres=self.iou_thres,
+                                      conf_thres=self.conf_thres,
+                                      classes=self.classes,
+                                      agnostic=self.agnostic,
+                                      max_det=self.max_det)[0]
+        det = scale_boxes(im_shape[2:], copy.deepcopy(pred[:, :4]), im0_shape).round()
+        det = np.concatenate([det, pred[:, 4:]], axis=1)
+
+        return pred, det
 
     def get_time(self):
         return time.time()
+
+    def output_spec(self):
+        """
+        Get the specs for the output tensors of the network. Useful to prepare memory allocations.
+        :return: A list with two items per element, the shape and (numpy) datatype of each output tensor.
+        """
+        specs = []
+        for o in self.outputs:
+            specs.append((o['shape'], o['dtype']))
+        return specs
 
 
 if __name__ == "__main__":
@@ -114,3 +158,18 @@ if __name__ == "__main__":
     t1 = yolov5.get_time()
     _y = yolov5.infer(_im)
     t2 = yolov5.get_time()
+    _pred, _det = yolov5.postprocess(_y, _im.shape, _im0.shape)
+    t3 = yolov5.get_time()
+
+    for d in _det:
+        cv2.rectangle(
+            _im0,
+            (int(d[0]), int(d[1])),
+            (int(d[2]), int(d[3])),
+            (0, 0, 255),
+            1,
+            cv2.LINE_AA
+        )
+    cv2.imshow('result', _im0)
+    cv2.waitKey(0)
+    print(f"{_im0.shape} size image - pre: {t1 - t0:.6f} / infer: {t2 - t1:.6f} / post: {t3 - t2:.6f}")

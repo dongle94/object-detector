@@ -7,4 +7,5 @@ onnxruntime-gpu>=1.14.1
 onnxconverter-common
 
 # TensorRT
-cuda-python==11.8.3
+cuda-python==11.8.2
+tensorrt-cu11==10.0.1

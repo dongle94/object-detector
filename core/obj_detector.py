@@ -61,6 +61,10 @@ class ObjectDetector(object):
                     from core.yolov8.yolov8_ort import Yolov8ORT
                     model = Yolov8ORT
                     self.framework = 'onnx'
+                elif ext in ['.engine', '.bin']:
+                    from core.yolov8.yolov8_trt import Yolov8TRT
+                    model = Yolov8TRT
+                    self.framework = 'trt'
                 else:
                     raise FileNotFoundError('No Yolov8 weight File!')
             else:

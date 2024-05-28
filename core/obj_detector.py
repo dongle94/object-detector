@@ -57,6 +57,10 @@ class ObjectDetector(object):
                     from core.yolov8.yolov8_pt import Yolov8Torch
                     model = Yolov8Torch
                     self.framework = 'torch'
+                elif ext == '.onnx':
+                    from core.yolov8.yolov8_ort import Yolov8ORT
+                    model = Yolov8ORT
+                    self.framework = 'onnx'
                 else:
                     raise FileNotFoundError('No Yolov8 weight File!')
             else:

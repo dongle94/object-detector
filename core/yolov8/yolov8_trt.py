@@ -15,16 +15,16 @@ ROOT = FILE.parents[2]
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
-from core.yolov5 import YOLOV5
-from core.yolov5.yolov5_utils.augmentations import letterbox
-from core.yolov5.yolov5_utils.general import non_max_suppression_np, scale_boxes, non_max_suppression
+from core.yolov8 import YOLOv8
+from core.yolov8.data.augment import LetterBox
+from core.yolov8.yolov8_utils.ops import scale_boxes, non_max_suppression_np, non_max_suppression
 
 
-class Yolov5TRT(YOLOV5):
+class Yolov8TRT(YOLOv8):
     def __init__(self, weight: str, device: str = "cpu", img_size: int = 640, fp16: bool = False, auto: bool = False,
                  gpu_num: int = 0, conf_thres=0.25, iou_thres=0.45, agnostic=False, max_det=100,
                  classes: Union[list, None] = None):
-        super(Yolov5TRT, self).__init__()
+        super(Yolov8TRT, self).__init__()
         self.device = device
         self.img_size = img_size
         self.auto = auto
@@ -66,6 +66,7 @@ class Yolov5TRT(YOLOV5):
             else:
                 self.outputs.append(binding)
         self.names = {i: f'class{i}' for i in range(999)}
+        self.letter_box = LetterBox(self.img_size, auto=self.auto)
 
         # prams for postprocessing
         self.conf_thres = conf_thres
@@ -78,11 +79,10 @@ class Yolov5TRT(YOLOV5):
         im = np.zeros(img_size, dtype=np.float16 if self.fp16 else np.float32)  # input
         t = self.get_time()
         self.infer(im)  # warmup
-        print(f"-- Yolov5 TRT Detector warmup: {self.get_time() - t:.6f} sec --")
+        print(f"-- Yolov8 TRT Detector warmup: {self.get_time() - t:.6f} sec --")
 
     def preprocess(self, img):
-        # TODO CHECK
-        im = letterbox(img, new_shape=self.img_size, auto=self.auto)[0]  # padded resize
+        im = self.letter_box(image=img)
         im = im.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
         im = np.ascontiguousarray(im).astype(np.float32)  # contiguous
 
@@ -157,7 +157,7 @@ if __name__ == "__main__":
     set_config('./configs/config.yaml')
     cfg = get_config()
 
-    yolov5 = Yolov5TRT(
+    yolov5 = Yolov8TRT(
         cfg.det_model_path, device=cfg.device, img_size=cfg.yolov5_img_size, fp16=cfg.det_half, auto=False,
         gpu_num=cfg.gpu_num, conf_thres=cfg.det_conf_thres, iou_thres=cfg.yolov5_nms_iou,
         agnostic=cfg.yolov5_agnostic_nms, max_det=cfg.yolov5_max_det, classes=cfg.det_obj_classes

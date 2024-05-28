@@ -16,7 +16,7 @@ if str(ROOT) not in sys.path:
 
 from core.yolov8 import YOLOv8
 from core.yolov8.data.augment import LetterBox
-from core.yolov8.yolov8_utils.ops import scale_boxes, non_max_suppression_np
+from core.yolov8.yolov8_utils.ops import scale_boxes, non_max_suppression_np, non_max_suppression
 
 
 class Yolov8ORT(YOLOv8):
@@ -107,14 +107,26 @@ class Yolov8ORT(YOLOv8):
     def postprocess(self, pred, im_shape, im0_shape):
         if self.device == 'cuda':
             pred = self.io_binding.copy_outputs_to_cpu()[0]
-        pred = non_max_suppression_np(prediction=pred,
-                                      iou_thres=self.iou_thres,
-                                      conf_thres=self.conf_thres,
-                                      classes=self.classes,
-                                      agnostic=self.agnostic,
-                                      max_det=self.max_det)[0]
-        det = scale_boxes(im_shape[2:], copy.deepcopy(pred[:, :4]), im0_shape).round()
-        det = np.concatenate([det, pred[:, 4:]], axis=1)
+        if self.fp16:
+            pred = torch.from_numpy(pred)
+            pred = non_max_suppression(prediction=pred,
+                                       iou_thres=self.iou_thres,
+                                       conf_thres=self.conf_thres,
+                                       classes=self.classes,
+                                       agnostic=self.agnostic,
+                                       max_det=self.max_det)[0]
+            det = scale_boxes(im_shape[2:], copy.deepcopy(pred[:, :4]), im0_shape).round()
+            det = torch.cat([det, pred[:, 4:]], dim=1)
+            det = det.cpu().numpy()
+        else:
+            pred = non_max_suppression_np(prediction=pred,
+                                          iou_thres=self.iou_thres,
+                                          conf_thres=self.conf_thres,
+                                          classes=self.classes,
+                                          agnostic=self.agnostic,
+                                          max_det=self.max_det)[0]
+            det = scale_boxes(im_shape[2:], copy.deepcopy(pred[:, :4]), im0_shape).round()
+            det = np.concatenate([det, pred[:, 4:]], axis=1)
 
         return pred, det
 

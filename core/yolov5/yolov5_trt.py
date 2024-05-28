@@ -6,6 +6,7 @@ import numpy as np
 from typing import Union
 from pathlib import Path
 
+import torch
 from cuda import cudart
 import tensorrt as trt
 
@@ -16,7 +17,7 @@ if str(ROOT) not in sys.path:
 
 from core.yolov5 import YOLOV5
 from core.yolov5.yolov5_utils.augmentations import letterbox
-from core.yolov5.yolov5_utils.general import non_max_suppression_np, scale_boxes
+from core.yolov5.yolov5_utils.general import non_max_suppression_np, scale_boxes, non_max_suppression
 
 
 class Yolov5TRT(YOLOV5):
@@ -112,14 +113,26 @@ class Yolov5TRT(YOLOV5):
         return outputs[0]
 
     def postprocess(self, pred, im_shape, im0_shape):
-        pred = non_max_suppression_np(prediction=pred,
-                                      iou_thres=self.iou_thres,
-                                      conf_thres=self.conf_thres,
-                                      classes=self.classes,
-                                      agnostic=self.agnostic,
-                                      max_det=self.max_det)[0]
-        det = scale_boxes(im_shape[2:], copy.deepcopy(pred[:, :4]), im0_shape).round()
-        det = np.concatenate([det, pred[:, 4:]], axis=1)
+        if self.fp16:
+            pred = torch.from_numpy(pred)
+            pred = non_max_suppression(prediction=pred,
+                                       iou_thres=self.iou_thres,
+                                       conf_thres=self.conf_thres,
+                                       classes=self.classes,
+                                       agnostic=self.agnostic,
+                                       max_det=self.max_det)[0]
+            det = scale_boxes(im_shape[2:], copy.deepcopy(pred[:, :4]), im0_shape).round()
+            det = torch.cat([det, pred[:, 4:]], dim=1)
+            det = det.cpu().numpy()
+        else:
+            pred = non_max_suppression_np(prediction=pred,
+                                          iou_thres=self.iou_thres,
+                                          conf_thres=self.conf_thres,
+                                          classes=self.classes,
+                                          agnostic=self.agnostic,
+                                          max_det=self.max_det)[0]
+            det = scale_boxes(im_shape[2:], copy.deepcopy(pred[:, :4]), im0_shape).round()
+            det = np.concatenate([det, pred[:, 4:]], axis=1)
 
         return pred, det
 

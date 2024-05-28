@@ -16,7 +16,7 @@ if str(ROOT) not in sys.path:
 
 from core.yolov8 import YOLOv8
 from core.yolov8.data.augment import LetterBox
-from core.yolov8.yolov8_utils.ops import scale_boxes, non_max_suppression_np, non_max_suppression
+from core.yolov8.yolov8_utils.ops import scale_boxes, non_max_suppression_np
 
 
 class Yolov8ORT(YOLOv8):

@@ -15,7 +15,6 @@ if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
 from core.yolov5 import YOLOV5
-from core.yolov5.yolov5_utils.torch_utils import select_device
 from core.yolov5.yolov5_utils.augmentations import letterbox
 from core.yolov5.yolov5_utils.general import non_max_suppression_np, scale_boxes
 
@@ -25,7 +24,7 @@ class Yolov5TRT(YOLOV5):
                  gpu_num: int = 0, conf_thres=0.25, iou_thres=0.45, agnostic=False, max_det=100,
                  classes: Union[list, None] = None):
         super(Yolov5TRT, self).__init__()
-        self.device = select_device(device=device, gpu_num=gpu_num)
+        self.device = device
         self.img_size = img_size
         self.auto = auto
         self.gpu_num = gpu_num
@@ -78,7 +77,7 @@ class Yolov5TRT(YOLOV5):
         im = np.zeros(img_size, dtype=np.float16 if self.fp16 else np.float32)  # input
         t = self.get_time()
         self.infer(im)  # warmup
-        print(f"-- Yolov5 Detector warmup: {self.get_time() - t:.6f} sec --")
+        print(f"-- Yolov5 TRT Detector warmup: {self.get_time() - t:.6f} sec --")
 
     def preprocess(self, img):
         # TODO CHECK

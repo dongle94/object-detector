@@ -172,7 +172,7 @@ if __name__ == "__main__":
             t = 0
         else:
             if et - st < wt:
-                t = wt - (et - st)
+                t = int((wt - (et - st)) * 1000)
             else:
                 t = 1
 
@@ -180,9 +180,5 @@ if __name__ == "__main__":
         if cv2.waitKey(t) == ord('q'):
             print("-- CV2 Stop --")
             break
-
-        # et = time.time()
-        # if et - st < wt:
-        #     time.sleep(wt - (et - st))
 
     print("-- Stop program --")

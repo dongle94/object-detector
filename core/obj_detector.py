@@ -159,13 +159,15 @@ if __name__ == "__main__":
         frame = media_loader.get_frame()
 
         _det = _detector.run(frame)
-
+        print(_det)
         for d in _det:
             x1, y1, x2, y2 = map(int, d[:4])
-            cls = int(d[5])
+            # cls = int(d[5])
             cv2.rectangle(frame, (x1, y1), (x2, y2), (96, 96, 216), thickness=2, lineType=cv2.LINE_AA)
-            cv2.putText(frame, str(_detector.names[cls]), (x1, y1+20), cv2.FONT_HERSHEY_SIMPLEX, 1,
-                        (96, 96, 96), thickness=1, lineType=cv2.LINE_AA)
+            print(_detector.names)
+            print(d)
+            # cv2.putText(frame, str(_detector.names[cls]), (x1, y1+20), cv2.FONT_HERSHEY_SIMPLEX, 1,
+            #             (96, 96, 96), thickness=1, lineType=cv2.LINE_AA)
 
         et = time.time()
         if media_loader.is_imgs:

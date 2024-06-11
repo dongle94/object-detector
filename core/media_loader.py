@@ -1,6 +1,13 @@
 import os
+import sys
 import cv2
 from pathlib import Path
+
+FILE = Path(__file__).resolve()
+ROOT = FILE.parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))  # add ROOT to PATH
+os.chdir(ROOT)
 
 from core.medialoader import load_images, load_video, load_stream
 
@@ -68,7 +75,6 @@ class MediaLoader(object):
 
 
 if __name__ == "__main__":
-    # import sys
     from utils.config import set_config, get_config
 
     # s = sys.argv[1]      # video file, webcam, rtsp stream... 0etc

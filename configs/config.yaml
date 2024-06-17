@@ -13,6 +13,11 @@ MEDIA:
   FPS: 30
   REALTIME: False
   BGR: True
+  ENABLE_PARAM: False
+  CV_PARAM:
+    - cv2.CAP_PROP_AUTO_EXPOSURE: 1
+    - cv2.CAP_PROP_BRIGHTNESS: 128
+    - cv2.CAP_PROP_EXPOSURE: 50
 
 # Object Detector
 DET:

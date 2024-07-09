@@ -10,6 +10,22 @@ from ultralytics.utils import DEFAULT_CFG_DICT, DEFAULT_CFG_KEYS, emojis
 from ultralytics.utils.checks import check_requirements, check_suffix
 
 
+class Ensemble(nn.ModuleList):
+    """Ensemble of models."""
+
+    def __init__(self):
+        """Initialize an ensemble of models."""
+        super().__init__()
+
+    def forward(self, x, augment=False, profile=False, visualize=False):
+        """Function generates the YOLO network's final layer."""
+        y = [module(x, augment, profile, visualize)[0] for module in self]
+        # y = torch.stack(y).max(0)[0]  # max ensemble
+        # y = torch.stack(y).mean(0)  # mean ensemble
+        y = torch.cat(y, 2)  # nms ensemble, y shape(B, HW, C)
+        return y, None  # inference, train output
+
+
 @contextlib.contextmanager
 def temporary_modules(modules=None):
     """
@@ -97,6 +113,46 @@ def torch_safe_load(weight):
     return ckpt, file  # load
 
 
+def attempt_load_weights(weights, device=None, inplace=True, fuse=False):
+    """Loads an ensemble of models weights=[a,b,c] or a single model weights=[a] or weights=a."""
+
+    ensemble = Ensemble()
+    for w in weights if isinstance(weights, list) else [weights]:
+        ckpt, w = torch_safe_load(w)  # load ckpt
+        args = {**DEFAULT_CFG_DICT, **ckpt["train_args"]} if "train_args" in ckpt else None  # combined args
+        model = (ckpt.get("ema") or ckpt["model"]).to(device).float()  # FP32 model
+
+        # Model compatibility updates
+        model.args = args  # attach args to model
+        model.pt_path = w  # attach *.pt file path to model
+        model.task = guess_model_task(model)
+        if not hasattr(model, "stride"):
+            model.stride = torch.tensor([32.0])
+
+        # Append
+        ensemble.append(
+            model.fuse().eval() if fuse and hasattr(model, "fuse") else model.eval())  # model in eval mode
+
+    # Module updates
+    for m in ensemble.modules():
+        if hasattr(m, "inplace"):
+            m.inplace = inplace
+        elif isinstance(m, nn.Upsample) and not hasattr(m, "recompute_scale_factor"):
+            m.recompute_scale_factor = None  # torch 1.11.0 compatibility
+
+    # Return model
+    if len(ensemble) == 1:
+        return ensemble[-1]
+
+    # Return ensemble
+    print(f"Ensemble created with {weights}\n")
+    for k in "names", "nc", "yaml":
+        setattr(ensemble, k, getattr(ensemble[0], k))
+    ensemble.stride = ensemble[int(torch.argmax(torch.tensor([m.stride.max() for m in ensemble])))].stride
+    assert all(ensemble[0].nc == m.nc for m in ensemble), f"Models differ in class counts {[m.nc for m in ensemble]}"
+    return ensemble
+
+
 def attempt_load_one_weight(weight, device=None, inplace=True, fuse=False):
     """Loads a single model weights."""
     ckpt, weight = torch_safe_load(weight)  # load ckpt
@@ -180,15 +236,15 @@ def guess_model_task(model):
     # Guess from model filename
     if isinstance(model, (str, Path)):
         model = Path(model)
-        if "-seg" in model.stem or "segment" in model.parts:
-            return "segment"
-        elif "-cls" in model.stem or "classify" in model.parts:
-            return "classify"
-        elif "-pose" in model.stem or "pose" in model.parts:
-            return "pose"
-        elif "-obb" in model.stem or "obb" in model.parts:
-            return "obb"
-        elif "detect" in model.parts:
+        # if "-seg" in model.stem or "segment" in model.parts:
+        #     return "segment"
+        # elif "-cls" in model.stem or "classify" in model.parts:
+        #     return "classify"
+        # elif "-pose" in model.stem or "pose" in model.parts:
+        #     return "pose"
+        # elif "-obb" in model.stem or "obb" in model.parts:
+        #     return "obb"
+        if "detect" in model.parts:
             return "detect"
 
     # Unable to determine task from model

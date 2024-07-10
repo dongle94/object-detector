@@ -5,9 +5,118 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 
-from core.yolov8.nn.modules import Detect
-from ultralytics.utils import DEFAULT_CFG_DICT, DEFAULT_CFG_KEYS, emojis
-from ultralytics.utils.checks import check_requirements, check_suffix
+from core.yolov10.nn.modules import Detect
+from core.yolov10.yolov10_utils import DEFAULT_CFG_DICT, DEFAULT_CFG_KEYS, emojis
+from core.yolov10.yolov10_utils.checks import check_suffix
+from core.yolov10.yolov10_utils.loss import v10DetectLoss
+
+
+class BaseModel(nn.Module):
+    """The BaseModel class serves as a base class for all the models in the Ultralytics YOLO family."""
+
+    def forward(self, x, *args, **kwargs):
+        """
+        Forward pass of the model on a single scale. Wrapper for `_forward_once` method.
+
+        Args:
+            x (torch.Tensor | dict): The input image tensor or a dict including image tensor and gt labels.
+
+        Returns:
+            (torch.Tensor): The output of the network.
+        """
+        if isinstance(x, dict):  # for cases of training and validating while training.
+            return self.loss(x, *args, **kwargs)
+        return self.predict(x, *args, **kwargs)
+
+    def predict(self, x, profile=False, visualize=False, augment=False, embed=None):
+        """
+        Perform a forward pass through the network.
+
+        Args:
+            x (torch.Tensor): The input tensor to the model.
+            profile (bool):  Print the computation time of each layer if True, defaults to False.
+            visualize (bool): Save the feature maps of the model if True, defaults to False.
+            augment (bool): Augment image during prediction, defaults to False.
+            embed (list, optional): A list of feature vectors/embeddings to return.
+
+        Returns:
+            (torch.Tensor): The last output of the model.
+        """
+        if augment:
+            return self._predict_augment(x)
+        return self._predict_once(x, profile, visualize, embed)
+
+    def _predict_once(self, x, profile=False, visualize=False, embed=None):
+        """
+        Perform a forward pass through the network.
+
+        Args:
+            x (torch.Tensor): The input tensor to the model.
+            profile (bool):  Print the computation time of each layer if True, defaults to False.
+            visualize (bool): Save the feature maps of the model if True, defaults to False.
+            embed (list, optional): A list of feature vectors/embeddings to return.
+
+        Returns:
+            (torch.Tensor): The last output of the model.
+        """
+        y, dt, embeddings = [], [], []  # outputs
+        for m in self.model:
+            if m.f != -1:  # if not from previous layer
+                x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers
+            # if profile:
+            #     self._profile_one_layer(m, x, dt)
+            x = m(x)  # run
+            y.append(x if m.i in self.save else None)  # save output
+            # if visualize:
+            #     feature_visualization(x, m.type, m.i, save_dir=visualize)
+            # if embed and m.i in embed:
+            #     embeddings.append(nn.functional.adaptive_avg_pool2d(x, (1, 1)).squeeze(-1).squeeze(-1))  # flatten
+            #     if m.i == max(embed):
+            #         return torch.unbind(torch.cat(embeddings, 1), dim=0)
+        return x
+
+
+class DetectionModel(BaseModel):
+    """YOLOv8 detection model."""
+
+    def __init__(self, cfg="yolov8n.yaml", ch=3, nc=None, verbose=True):  # model, input channels, number of classes
+        """Initialize the YOLOv8 detection model with the given config and parameters."""
+        super().__init__()
+        # self.yaml = cfg if isinstance(cfg, dict) else yaml_model_load(cfg)  # cfg dict
+        #
+        # # Define model
+        # ch = self.yaml["ch"] = self.yaml.get("ch", ch)  # input channels
+        # if nc and nc != self.yaml["nc"]:
+        #     LOGGER.info(f"Overriding model.yaml nc={self.yaml['nc']} with nc={nc}")
+        #     self.yaml["nc"] = nc  # override YAML value
+        # self.model, self.save = parse_model(deepcopy(self.yaml), ch=ch, verbose=verbose)  # model, savelist
+        # self.names = {i: f"{i}" for i in range(self.yaml["nc"])}  # default names dict
+        # self.inplace = self.yaml.get("inplace", True)
+        #
+        # # Build strides
+        # m = self.model[-1]  # Detect()
+        # if isinstance(m, Detect):  # includes all Detect subclasses like Segment, Pose, OBB, WorldDetect
+        #     s = 256  # 2x min stride
+        #     m.inplace = self.inplace
+        #     forward = lambda x: self.forward(x)[0] if isinstance(m, (Segment, Pose, OBB)) else self.forward(x)
+        #     if isinstance(m, v10Detect):
+        #         forward = lambda x: self.forward(x)["one2many"]
+        #     m.stride = torch.tensor([s / x.shape[-2] for x in forward(torch.zeros(1, ch, s, s))])  # forward
+        #     self.stride = m.stride
+        #     m.bias_init()  # only run once
+        # else:
+        #     self.stride = torch.Tensor([32])  # default stride for i.e. RTDETR
+        #
+        # # Init weights, biases
+        # initialize_weights(self)
+        # if verbose:
+        #     self.info()
+        #     LOGGER.info("")
+
+
+class YOLOv10DetectionModel(DetectionModel):
+    def init_criterion(self):
+        return v10DetectLoss(self)
 
 
 class Ensemble(nn.ModuleList):
@@ -75,9 +184,12 @@ def torch_safe_load(weight):
     try:
         with temporary_modules(
             {
-                "ultralytics.yolo.utils": "ultralytics.utils",
+                "ultralytics.yolo.utils": "core.yolov10.yolov10_utils",
                 "ultralytics.yolo.v8": "ultralytics.models.yolo",
                 "ultralytics.yolo.data": "ultralytics.data",
+                'ultralytics.nn.tasks': 'core.yolov10.nn.tasks',
+                'ultralytics.nn.modules.block': 'core.yolov10.nn.modules.block',
+                'ultralytics.nn.modules.head': 'core.yolov10.nn.modules.head',
             }
         ):  # for legacy 8.0 Classify and Pose models
             ckpt = torch.load(file, map_location="cpu")

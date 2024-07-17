@@ -11,7 +11,7 @@ import torch
 import torch.nn.functional as F
 import torchvision
 
-from core.yolov8.yolov8_utils.metrics import batch_probiou
+from core.yolo.utils.metrics import batch_probiou
 
 
 def scale_boxes(img1_shape, boxes, img0_shape, ratio_pad=None, padding=True, xywh=False):
@@ -50,6 +50,50 @@ def scale_boxes(img1_shape, boxes, img0_shape, ratio_pad=None, padding=True, xyw
             boxes[..., 3] -= pad[1]  # y padding
     boxes[..., :4] /= gain
     return clip_boxes(boxes, img0_shape)
+
+
+def clip_boxes(boxes, shape):
+    """
+    Takes a list of bounding boxes and a shape (height, width) and clips the bounding boxes to the shape.
+
+    Args:
+        boxes (torch.Tensor): the bounding boxes to clip
+        shape (tuple): the shape of the image
+
+    Returns:
+        (torch.Tensor | numpy.ndarray): Clipped boxes
+    """
+    if isinstance(boxes, torch.Tensor):  # faster individually (WARNING: inplace .clamp_() Apple MPS bug)
+        boxes[..., 0] = boxes[..., 0].clamp(0, shape[1])  # x1
+        boxes[..., 1] = boxes[..., 1].clamp(0, shape[0])  # y1
+        boxes[..., 2] = boxes[..., 2].clamp(0, shape[1])  # x2
+        boxes[..., 3] = boxes[..., 3].clamp(0, shape[0])  # y2
+    else:  # np.array (faster grouped)
+        boxes[..., [0, 2]] = boxes[..., [0, 2]].clip(0, shape[1])  # x1, x2
+        boxes[..., [1, 3]] = boxes[..., [1, 3]].clip(0, shape[0])  # y1, y2
+    return boxes
+
+
+def xywh2xyxy(x):
+    """
+    Convert bounding box coordinates from (x, y, width, height) format to (x1, y1, x2, y2) format where (x1, y1) is the
+    top-left corner and (x2, y2) is the bottom-right corner.
+
+    Args:
+        x (np.ndarray | torch.Tensor): The input bounding box coordinates in (x, y, width, height) format.
+
+    Returns:
+        y (np.ndarray | torch.Tensor): The bounding box coordinates in (x1, y1, x2, y2) format.
+    """
+    assert x.shape[-1] == 4, f"input shape last dimension expected 4 but input shape is {x.shape}"
+    y = torch.empty_like(x) if isinstance(x, torch.Tensor) else np.empty_like(x)  # faster than clone/copy
+    dw = x[..., 2] / 2  # half-width
+    dh = x[..., 3] / 2  # half-height
+    y[..., 0] = x[..., 0] - dw  # top left x
+    y[..., 1] = x[..., 1] - dh  # top left y
+    y[..., 2] = x[..., 0] + dw  # bottom right x
+    y[..., 3] = x[..., 1] + dh  # bottom right y
+    return y
 
 
 def nms_rotated(boxes, scores, threshold=0.45):
@@ -367,28 +411,6 @@ def box_iou_np(box1, box2, eps=1e-7):
 
     # IoU = inter / (area1 + area2 - inter)
     return inter / (((a2 - a1) * 2) + ((b2 - b1) * 2) - inter + eps)
-
-
-def clip_boxes(boxes, shape):
-    """
-    Takes a list of bounding boxes and a shape (height, width) and clips the bounding boxes to the shape.
-
-    Args:
-        boxes (torch.Tensor): the bounding boxes to clip
-        shape (tuple): the shape of the image
-
-    Returns:
-        (torch.Tensor | numpy.ndarray): Clipped boxes
-    """
-    if isinstance(boxes, torch.Tensor):  # faster individually (WARNING: inplace .clamp_() Apple MPS bug)
-        boxes[..., 0] = boxes[..., 0].clamp(0, shape[1])  # x1
-        boxes[..., 1] = boxes[..., 1].clamp(0, shape[0])  # y1
-        boxes[..., 2] = boxes[..., 2].clamp(0, shape[1])  # x2
-        boxes[..., 3] = boxes[..., 3].clamp(0, shape[0])  # y2
-    else:  # np.array (faster grouped)
-        boxes[..., [0, 2]] = boxes[..., [0, 2]].clip(0, shape[1])  # x1, x2
-        boxes[..., [1, 3]] = boxes[..., [1, 3]].clip(0, shape[0])  # y1, y2
-    return boxes
 
 
 def clip_coords(coords, shape):
@@ -894,3 +916,19 @@ def clean_str(s):
         (str): a string with special characters replaced by an underscore _
     """
     return re.sub(pattern="[|@#!¡·$€%&()=?¿^*;:,¨´><+]", repl="_", string=s)
+
+
+def v10postprocess(preds, max_det, nc=80):
+    assert (4 + nc == preds.shape[-1])
+    boxes, scores = preds.split([4, nc], dim=-1)
+    max_scores = scores.amax(dim=-1)
+    max_scores, index = torch.topk(max_scores, max_det, dim=-1)
+    index = index.unsqueeze(-1)
+    boxes = torch.gather(boxes, dim=1, index=index.repeat(1, 1, boxes.shape[-1]))
+    scores = torch.gather(scores, dim=1, index=index.repeat(1, 1, scores.shape[-1]))
+
+    scores, index = torch.topk(scores.flatten(1), max_det, dim=-1)
+    labels = index % nc
+    index = index // nc
+    boxes = boxes.gather(dim=1, index=index.unsqueeze(-1).repeat(1, 1, boxes.shape[-1]))
+    return boxes, scores, labels

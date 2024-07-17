@@ -54,15 +54,15 @@ class ObjectDetector(object):
                 # model load with weight
                 ext = os.path.splitext(weight)[1]
                 if ext in ['.pt', '.pth']:
-                    from core.yolov8.yolov8_pt import Yolov8Torch
+                    from core.yolo.yolov8_pt import Yolov8Torch
                     model = Yolov8Torch
                     self.framework = 'torch'
                 elif ext == '.onnx':
-                    from core.yolov8.yolov8_ort import Yolov8ORT
+                    from core.yolo.yolov8_ort import Yolov8ORT
                     model = Yolov8ORT
                     self.framework = 'onnx'
                 elif ext in ['.engine', '.bin']:
-                    from core.yolov8.yolov8_trt import Yolov8TRT
+                    from core.yolo.yolov8_trt import Yolov8TRT
                     model = Yolov8TRT
                     self.framework = 'trt'
                 else:
@@ -70,7 +70,7 @@ class ObjectDetector(object):
             elif self.detector_type == "yolov10":
                 ext = os.path.splitext(weight)[1]
                 if ext in ['.pt', '.pth']:
-                    from core.yolov10.yolov10_pt import Yolov10Torch
+                    from core.yolo.yolov10_pt import Yolov10Torch
                     model = Yolov10Torch
                     self.framework = 'torch'
             else:

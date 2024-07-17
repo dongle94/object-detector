@@ -9,11 +9,11 @@ ROOT = FILE.parents[2]
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
-from core.yolov10.yolov10_utils.torch_utils import select_device
-from core.yolov10.nn.tasks import attempt_load_weights
-from core.yolov10.yolov10_utils.checks import check_imgsz
-from core.yolov10.data.augment import LetterBox
-from core.yolov10.yolov10_utils.ops import v10postprocess, xywh2xyxy, scale_boxes
+from core.yolo.utils.torch_utils import select_device
+from core.yolo.nn.tasks import attempt_load_weights
+from core.yolo.utils.checks import check_imgsz
+from core.yolo.data.augment import LetterBox
+from core.yolo.utils.ops import v10postprocess, xywh2xyxy, scale_boxes
 
 
 class Yolov10Torch(object):

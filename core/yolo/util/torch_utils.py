@@ -9,7 +9,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from core.yolo import __version__
-from core.yolo.util import PYTHON_VERSION
 from core.yolo.util.checks import check_version
 
 

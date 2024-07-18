@@ -21,23 +21,16 @@ MEDIA:
 
 # Object Detector
 DET:
-  MODEL_TYPE: yolov5
-  DET_MODEL_PATH: './weights/yolov5m.pt'
+  MODEL_TYPE: yolov8
+  DET_MODEL_PATH: './weights/yolov8/yolov8m.pt'
   HALF: False
   CONF_THRES: 0.5
-  OBJ_CLASSES: [0]
-
-YOLOV5:
-  IMG_SIZE: 640
-  NMS_IOU: 0.45
-  AGNOSTIC_NMS: True
-  MAX_DET: 100
-
-YOLOV8:
-  IMG_SIZE: 640
-  NMS_IOU: 0.45
-  AGNOSTIC_NMS: False
-  MAX_DET: 100
+  OBJ_CLASSES: None
+  YOLO:
+    IMG_SIZE: 640
+    NMS_IOU: 0.45
+    AGNOSTIC_NMS: True
+    MAX_DET: 100
 
 
 # Object Tracker

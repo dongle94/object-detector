@@ -317,11 +317,6 @@ class DetectionModel(BaseModel):
         return E2EDetectLoss(self) if getattr(self, "end2end", False) else v8DetectionLoss(self)
 
 
-class YOLOv10DetectionModel(DetectionModel):
-    def init_criterion(self):
-        return v10DetectLoss(self)
-
-
 class Ensemble(nn.ModuleList):
     """Ensemble of models."""
 

@@ -18,9 +18,9 @@ TORCH_2_0 = check_version(torch.__version__, "2.0.0")
 
 @contextmanager
 def torch_distributed_zero_first(local_rank: int):
-    """Decorator to make all processes in distributed training wait for each local_master to do something."""
-    initialized = torch.distributed.is_available() and torch.distributed.is_initialized()
-    if initialized and local_rank not in (-1, 0):
+    """Ensures all processes in distributed training wait for the local master (rank 0) to complete a task first."""
+    initialized = dist.is_available() and dist.is_initialized()
+    if initialized and local_rank not in {-1, 0}:
         dist.barrier(device_ids=[local_rank])
     yield
     if initialized and local_rank == 0:
@@ -67,7 +67,7 @@ def select_device(device="", gpu_num=0):
     for remove in "cuda:", "none", "(", ")", "[", "]", "'", " ":
         device = device.replace(remove, "")  # to string, 'cuda:0' -> '0' and '(0, 1)' -> '0,1'
     cpu = device == "cpu"
-    mps = device in ("mps", "mps:0")  # Apple Metal Performance Shaders (MPS)
+    mps = device in {"mps", "mps:0"}  # Apple Metal Performance Shaders (MPS)
     if cpu or mps:
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # force torch.cuda.is_available() = False
     elif device:  # non-cpu device requested
@@ -76,19 +76,23 @@ def select_device(device="", gpu_num=0):
         visible = os.environ.get("CUDA_VISIBLE_DEVICES", None)
 
         # os.environ["CUDA_VISIBLE_DEVICES"] = device  # set environment variable - must be before assert is_available()
-        install = (
-            "See https://pytorch.org/get-started/locally/ for up-to-date torch install instructions if no "
-            "CUDA devices are seen by torch.\n"
-            if torch.cuda.device_count() == 0
-            else ""
-        )
-        assert torch.cuda.is_available() and torch.cuda.device_count() >= gpu_num + 1, \
-            f"Invalid CUDA 'device={device}' requested. Use 'device=cpu' or pass valid CUDA device(s) if available," \
-            + "i.e. 'device=0' or 'device=0,1,2,3' for Multi-GPU." \
-            + f"torch.cuda.is_available(): {torch.cuda.is_available()}" \
-            + f"\ntorch.cuda.device_count(): {torch.cuda.device_count()}" \
-            + f"\nos.environ['CUDA_VISIBLE_DEVICES']: {visible}" \
-            + f"\n{install}"
+        if not (torch.cuda.is_available() and torch.cuda.device_count() >= len(device.split(","))):
+            print(s)
+            install = (
+                "See https://pytorch.org/get-started/locally/ for up-to-date torch install instructions if no "
+                "CUDA devices are seen by torch.\n"
+                if torch.cuda.device_count() == 0
+                else ""
+            )
+            raise ValueError(
+                f"Invalid CUDA 'device={device}' requested."
+                f" Use 'device=cpu' or pass valid CUDA device(s) if available,"
+                f" i.e. 'device=0' or 'device=0,1,2,3' for Multi-GPU.\n"
+                f"\ntorch.cuda.is_available(): {torch.cuda.is_available()}"
+                f"\ntorch.cuda.device_count(): {torch.cuda.device_count()}"
+                f"\nos.environ['CUDA_VISIBLE_DEVICES']: {visible}\n"
+                f"{install}"
+            )
 
     if not cpu and not mps and torch.cuda.is_available():  # prefer GPU if available
         arg = f"cuda:{gpu_num}"
@@ -155,7 +159,7 @@ def scale_img(img, ratio=1.0, same_shape=False, gs=32):
     img = F.interpolate(img, size=s, mode="bilinear", align_corners=False)  # resize
     if not same_shape:  # pad/crop img
         h, w = (math.ceil(x * ratio / gs) * gs for x in (h, w))
-    return F.pad(img, [0, w - s[1], 0, h - s[0]], value=0.447)  # va
+    return F.pad(img, [0, w - s[1], 0, h - s[0]], value=0.447)  # value = imagenet mean
 
 
 def make_divisible(x, divisor):
@@ -163,4 +167,3 @@ def make_divisible(x, divisor):
     if isinstance(divisor, torch.Tensor):
         divisor = int(divisor.max())  # to int
     return math.ceil(x / divisor) * divisor
-

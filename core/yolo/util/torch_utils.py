@@ -1,13 +1,19 @@
+import math
 import os
 import platform
-import torch
-import torch.distributed as dist
 from contextlib import contextmanager
 
-from core.yolov8 import __version__
-from core.yolov8.yolov8_utils.checks import check_version
+import torch
+import torch.distributed as dist
+import torch.nn as nn
+import torch.nn.functional as F
+
+from core.yolo import __version__
+from core.yolo.util import PYTHON_VERSION
+from core.yolo.util.checks import check_version
 
 
+TORCH_1_9 = check_version(torch.__version__, "1.9.0")
 TORCH_2_0 = check_version(torch.__version__, "2.0.0")
 
 
@@ -94,3 +100,68 @@ def select_device(device="", gpu_num=0):
         arg = "cpu"
 
     return torch.device(arg)
+
+
+def fuse_conv_and_bn(conv, bn):
+    """Fuse Conv2d() and BatchNorm2d() layers https://tehnokv.com/posts/fusing-batchnorm-and-conv/."""
+    fusedconv = (
+        nn.Conv2d(
+            conv.in_channels,
+            conv.out_channels,
+            kernel_size=conv.kernel_size,
+            stride=conv.stride,
+            padding=conv.padding,
+            dilation=conv.dilation,
+            groups=conv.groups,
+            bias=True,
+        )
+        .requires_grad_(False)
+        .to(conv.weight.device)
+    )
+
+    # Prepare filters
+    w_conv = conv.weight.clone().view(conv.out_channels, -1)
+    w_bn = torch.diag(bn.weight.div(torch.sqrt(bn.eps + bn.running_var)))
+    fusedconv.weight.copy_(torch.mm(w_bn, w_conv).view(fusedconv.weight.shape))
+
+    # Prepare spatial bias
+    b_conv = torch.zeros(conv.weight.shape[0], device=conv.weight.device) if conv.bias is None else conv.bias
+    b_bn = bn.bias - bn.weight.mul(bn.running_mean).div(torch.sqrt(bn.running_var + bn.eps))
+    fusedconv.bias.copy_(torch.mm(w_bn, b_conv.reshape(-1, 1)).reshape(-1) + b_bn)
+
+    return fusedconv
+
+
+def initialize_weights(model):
+    """Initialize model weights to random values."""
+    for m in model.modules():
+        t = type(m)
+        if t is nn.Conv2d:
+            pass  # nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+        elif t is nn.BatchNorm2d:
+            m.eps = 1e-3
+            m.momentum = 0.03
+        elif t in {nn.Hardswish, nn.LeakyReLU, nn.ReLU, nn.ReLU6, nn.SiLU}:
+            m.inplace = True
+
+
+def scale_img(img, ratio=1.0, same_shape=False, gs=32):
+    """Scales and pads an image tensor of shape img(bs,3,y,x) based on given ratio and grid size gs, optionally
+    retaining the original shape.
+    """
+    if ratio == 1.0:
+        return img
+    h, w = img.shape[2:]
+    s = (int(h * ratio), int(w * ratio))  # new size
+    img = F.interpolate(img, size=s, mode="bilinear", align_corners=False)  # resize
+    if not same_shape:  # pad/crop img
+        h, w = (math.ceil(x * ratio / gs) * gs for x in (h, w))
+    return F.pad(img, [0, w - s[1], 0, h - s[0]], value=0.447)  # va
+
+
+def make_divisible(x, divisor):
+    """Returns nearest x divisible by divisor."""
+    if isinstance(divisor, torch.Tensor):
+        divisor = int(divisor.max())  # to int
+    return math.ceil(x / divisor) * divisor
+

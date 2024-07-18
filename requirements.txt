@@ -1,6 +1,5 @@
 -r requirements/common.txt
--r requirements/yolov5.txt
--r requirements/yolov8.txt
+-r requirements/yolov.txt
 # -r requirements/tracker.txt
 -r requirements/optimization.txt
 

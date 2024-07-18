@@ -27,10 +27,10 @@ class ObjectDetector(object):
         self.framework = None
 
         if self.detector_type in ["yolov5", "yolov8", "yolov10"]:
-            img_size = cfg.yolov5_img_size
-            iou_thres = cfg.yolov5_nms_iou
-            agnostic = cfg.yolov5_agnostic_nms
-            max_det = cfg.yolov5_max_det
+            img_size = cfg.yolo_img_size
+            iou_thres = cfg.yolo_nms_iou
+            agnostic = cfg.yolo_agnostic_nms
+            max_det = cfg.yolo_max_det
             self.im_shape = None
             self.im0_shape = None
             if self.detector_type == "yolov5":
@@ -73,6 +73,8 @@ class ObjectDetector(object):
                     from core.yolo.yolov10_pt import Yolov10Torch
                     model = Yolov10Torch
                     self.framework = 'torch'
+                else:
+                    raise FileNotFoundError('No Yolov10 weight File!')
             else:
                 raise NotImplementedError(f'Unknown detector type: {self.detector_type}')
             self.detector = model(

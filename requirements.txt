@@ -1,9 +1,7 @@
 -r requirements/common.txt
--r requirements/yolov5.txt
--r requirements/yolov8.txt
-# -r requirements/tracker.txt
+-r requirements/yolo.txt
 -r requirements/optimization.txt
 
-
+# -r requirements/tracker.txt
 # mosaic
 # -r requirements/mosaic.txt

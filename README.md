@@ -6,7 +6,8 @@ Object Detection based Project
 
 ## Installation
 - Ubuntu 20.04, 22.04 (test version)
-- python >= 3.8.x (test version)
+- python >= 3.8.x
+  - test: 3.8.18 / 3.10.14
 - CUDA >= 11.8 (test version)
 - recommend conda envs
 - torch 2.0.1 (test version)
@@ -22,13 +23,16 @@ $ pip install -r ./requirements.txt
 ## Modules
 - medialoader
 - detectors
-  - yolov5
+  - YOLOv5
     - pytorch, onnx, trt
-  - yolov8
+  - YOLOv8
     - pytorch, onnx, trt
+  - YOLOv10
+    - pytorch
 - ~~object_tracker~~
   - ~~osnet~~
 
 ## Reference
 - YOLOv5: https://github.com/ultralytics/yolov5
 - YOLOv8(ultraytics): https://github.com/ultralytics/ultralytics
+- YOLOv10: https://github.com/THU-MIG/yolov10

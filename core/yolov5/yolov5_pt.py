@@ -94,9 +94,9 @@ if __name__ == "__main__":
     cfg = get_config()
 
     # device: cpu, cuda, mps
-    yolov5 = Yolov5Torch(cfg.det_model_path, device=cfg.device, img_size=cfg.yolov5_img_size, fp16=cfg.det_half,
-                         auto=False, gpu_num=cfg.gpu_num, conf_thres=cfg.det_conf_thres, iou_thres=cfg.yolov5_nms_iou,
-                         agnostic=cfg.yolov5_agnostic_nms, max_det=cfg.yolov5_max_det, classes=cfg.det_obj_classes)
+    yolov5 = Yolov5Torch(cfg.det_model_path, device=cfg.device, img_size=cfg.yolo_img_size, fp16=cfg.det_half,
+                         auto=False, gpu_num=cfg.gpu_num, conf_thres=cfg.det_conf_thres, iou_thres=cfg.yolo_nms_iou,
+                         agnostic=cfg.yolo_agnostic_nms, max_det=cfg.yolo_max_det, classes=cfg.det_obj_classes)
     yolov5.warmup()
 
     _im = cv2.imread('./data/images/sample.jpg')

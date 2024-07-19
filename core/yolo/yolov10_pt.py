@@ -9,16 +9,16 @@ ROOT = FILE.parents[2]
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
-from core.yolo.utils.torch_utils import select_device
+from core.yolo.util.torch_utils import select_device
 from core.yolo.nn.tasks import attempt_load_weights
-from core.yolo.utils.checks import check_imgsz
+from core.yolo.util.checks import check_imgsz
 from core.yolo.data.augment import LetterBox
-from core.yolo.utils.ops import v10postprocess, xywh2xyxy, scale_boxes
+from core.yolo.util.ops import scale_boxes
 
 
 class Yolov10Torch(object):
     def __init__(self, weight: str, device: str = 'cpu', fp16: bool = False, fuse: bool = True, auto: bool = False,
-                 img_size: int = 640, conf_thres=0.25, max_det=100, classes: Union[list, None] = None, **kwargs):
+                 img_size: int = 640, conf_thres=0.25, classes: Union[list, None] = None, **kwargs):
         super(Yolov10Torch, self).__init__()
         self.device = select_device(device=device)
         self.cuda = torch.cuda.is_available() and device != "cpu"
@@ -42,7 +42,6 @@ class Yolov10Torch(object):
         # parameter for postprocessing
         self.conf_thres = conf_thres
         self.classes = classes
-        self.max_det = max_det
 
     def warmup(self, img_size=(1, 3, 640, 640)):
         im = torch.empty(*img_size, dtype=torch.half if self.fp16 else torch.float, device=self.device)
@@ -71,15 +70,12 @@ class Yolov10Torch(object):
             pred = pred["one2one"]
 
         if isinstance(pred, (list, tuple)):
-            pred = pred[0]
+            pred = pred[0]  # 1, 300, 6
 
         if pred.shape[-1] == 6:
             pass
         else:
-            pred = pred.transpose(-1, -2)
-            bboxes, scores, labels = v10postprocess(pred, self.max_det, pred.shape[-1] - 4)
-            bboxes = xywh2xyxy(bboxes)
-            pred = torch.cat([bboxes, scores.unsqueeze(-1), labels.unsqueeze(-1)], dim=-1)
+            raise
 
         mask = pred[..., 4] > self.conf_thres
         if self.classes is not None:
@@ -103,8 +99,8 @@ if __name__ == "__main__":
     set_config('./configs/config.yaml')
     cfg = get_config()
 
-    yolov10 = Yolov10Torch(cfg.det_model_path, device=cfg.device, fp16=cfg.det_half,
-                           img_size=cfg.yolov8_img_size)
+    yolov10 = Yolov10Torch(cfg.det_model_path, device=cfg.device, fp16=cfg.det_half, img_size=cfg.yolo_img_size,
+                           conf_thres=cfg.det_conf_thres, classes=cfg.det_obj_classes)
     yolov10.warmup()
 
     _im = cv2.imread('./data/images/sample.jpg')

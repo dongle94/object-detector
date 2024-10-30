@@ -21,11 +21,11 @@ from core.yolo.data.augment import LetterBox
 from utils.logger import get_logger
 
 
-class Yolov8Torch(YOLO):
+class Yolov5Torch(YOLO):
     def __init__(self, weight: str, device: str = 'cpu', gpu_num: int = 0, img_size: int = 640, fp16: bool = False,
                  auto: bool = False, fuse: bool = True, conf_thres=0.25, iou_thres=0.45, agnostic=False, max_det=100,
                  classes: Union[list, None] = None, **kwargs):
-        super(Yolov8Torch, self).__init__()
+        super(Yolov5Torch, self).__init__()
 
         self.logger = get_logger()
         self.device = select_device(device=device, gpu_num=gpu_num, logger=get_logger())
@@ -34,7 +34,7 @@ class Yolov8Torch(YOLO):
             self.fp16 = True
         else:
             self.fp16 = False
-            self.logger.info("YOLOv8 pytorch will not use fp16. It will apply fp32 precision.")
+            self.logger.info("YOLOv5 pytorch will not use fp16. It will apply fp32 precision.")
 
         model = attempt_load_weights(weight, device=self.device, inplace=True, fuse=fuse)
         self.model = model.half() if self.fp16 else model.float()
@@ -58,7 +58,7 @@ class Yolov8Torch(YOLO):
         im = torch.empty(*img_size, dtype=torch.half if self.fp16 else torch.float, device=self.device)
         t = self.get_time()
         self.infer(im)
-        self.logger.info(f"-- YOLOv8 Detector warmup: {time.time()-t:.6f} sec --")
+        self.logger.info(f"-- YOLOv5 Detector warmup: {time.time()-t:.6f} sec --")
 
     def preprocess(self, img):
         im = self.letter_box(image=img)
@@ -107,7 +107,7 @@ if __name__ == "__main__":
 
     init_logger(cfg)
 
-    _detector = Yolov8Torch(cfg.det_model_path, device=cfg.device, img_size=cfg.yolo_img_size, fp16=cfg.det_half,
+    _detector = Yolov5Torch(cfg.det_model_path, device=cfg.device, img_size=cfg.yolo_img_size, fp16=cfg.det_half,
                          gpu_num=cfg.gpu_num, conf_thres=cfg.det_conf_thres, iou_thres=cfg.yolo_nms_iou,
                          agnostic=cfg.yolo_agnostic_nms, max_det=cfg.yolo_max_det, classes=cfg.det_obj_classes)
     _detector.warmup()

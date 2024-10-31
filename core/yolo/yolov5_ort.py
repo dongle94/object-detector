@@ -85,7 +85,7 @@ class Yolov5ORT(YOLO):
 
     def preprocess(self, img):
         im = self.letter_box(image=img)
-        im = im[..., ::-1].transpose((2, 0, 1))  # BGR to RGB, BHWC to BCHW, (3, h, w)
+        im = im.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
         im = np.ascontiguousarray(im).astype(np.float32)  # contiguous
 
         im /= 255.0

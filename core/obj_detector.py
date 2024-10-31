@@ -37,11 +37,11 @@ class ObjectDetector(object):
                 # model load with weight
                 ext = os.path.splitext(weight)[1]
                 if ext in ['.pt', '.pth']:
-                    from core.yolov5.yolov5_pt import Yolov5Torch
+                    from core.yolo.yolov5_pt import Yolov5Torch
                     model = Yolov5Torch
                     self.framework = 'torch'
                 elif ext == '.onnx':
-                    from core.yolov5.yolov5_ort import Yolov5ORT
+                    from core.yolo.yolov5_ort import Yolov5ORT
                     model = Yolov5ORT
                     self.framework = 'onnx'
                 elif ext in ['.engine', '.bin']:
@@ -92,7 +92,7 @@ class ObjectDetector(object):
             self.names = self.detector.names
 
             # warm up
-            self.detector.warmup(img_size=(1, 3, img_size, img_size))
+            self.detector.warmup()
             self.logger.info(f"Successfully loaded weight from {weight}")
 
         # logging

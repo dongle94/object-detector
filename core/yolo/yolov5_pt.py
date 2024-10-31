@@ -58,7 +58,7 @@ class Yolov5Torch(YOLO):
         im = torch.empty(*img_size, dtype=torch.half if self.fp16 else torch.float, device=self.device)
         t = self.get_time()
         self.infer(im)
-        self.logger.info(f"-- YOLOv5 Detector warmup: {time.time()-t:.6f} sec --")
+        self.logger.info(f"-- YOLOv5 Pytorch Detector warmup: {time.time()-t:.6f} sec --")
 
     def preprocess(self, img):
         im = self.letter_box(image=img)
@@ -107,9 +107,18 @@ if __name__ == "__main__":
 
     init_logger(cfg)
 
-    _detector = Yolov5Torch(cfg.det_model_path, device=cfg.device, img_size=cfg.yolo_img_size, fp16=cfg.det_half,
-                         gpu_num=cfg.gpu_num, conf_thres=cfg.det_conf_thres, iou_thres=cfg.yolo_nms_iou,
-                         agnostic=cfg.yolo_agnostic_nms, max_det=cfg.yolo_max_det, classes=cfg.det_obj_classes)
+    _detector = Yolov5Torch(
+        cfg.det_model_path,
+        device=cfg.device,
+        gpu_num=cfg.gpu_num,
+        img_size=cfg.yolo_img_size,
+        fp16=cfg.det_half,
+        conf_thres=cfg.det_conf_thres,
+        iou_thres=cfg.yolo_nms_iou,
+        agnostic=cfg.yolo_agnostic_nms,
+        max_det=cfg.yolo_max_det,
+        classes=cfg.det_obj_classes
+    )
     _detector.warmup()
 
     _im = cv2.imread('./data/images/sample.jpg')
@@ -125,7 +134,7 @@ if __name__ == "__main__":
     for d in _det:
         x1, y1, x2, y2 = map(int, d[:4])
         cls = int(d[5])
-        cv2.rectangle(_im0, (x1, y1), (x2, y2), (96, 95, 216), thickness=2, lineType=cv2.LINE_AA)
+        cv2.rectangle(_im0, (x1, y1), (x2, y2), (96, 96, 216), thickness=2, lineType=cv2.LINE_AA)
         cv2.putText(_im0, str(_detector.names[cls]), (x1, y1 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
                     (96, 96, 96), thickness=1, lineType=cv2.LINE_AA)
 

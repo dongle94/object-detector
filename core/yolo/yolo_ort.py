@@ -20,11 +20,11 @@ from core.yolo.util.ops import scale_boxes, non_max_suppression_np, non_max_supp
 from utils.logger import get_logger
 
 
-class Yolov8ORT(YOLO):
+class YoloORT(YOLO):
     def __init__(self, weight: str, device: str = 'cpu', gpu_num: int = 0, img_size: int = 640, fp16: bool = False,
                  auto: bool = False, conf_thres=0.25, iou_thres=0.45, agnostic=False, max_det=100,
                  classes: Union[list, None] = None, **kwargs):
-        super(Yolov8ORT, self).__init__()
+        super(YoloORT, self).__init__()
 
         self.logger = get_logger()
         self.device = device
@@ -67,6 +67,7 @@ class Yolov8ORT(YOLO):
         self.classes = classes
         self.agnostic = agnostic
         self.max_det = max_det
+        self.kwargs = kwargs
 
     def warmup(self, img_size=None):
         if img_size is None:
@@ -81,7 +82,7 @@ class Yolov8ORT(YOLO):
 
         t = self.get_time()
         self.infer(im)
-        self.logger.info(f"-- YOLOv8 Onnx Detector warmup: {self.get_time() - t:.6f} sec --")
+        self.logger.info(f"-- {self.kwargs['model_type']} Onnx Detector warmup: {self.get_time() - t:.6f} sec --")
 
     def preprocess(self, img):
         im = self.letter_box(image=img)
@@ -151,7 +152,7 @@ if __name__ == "__main__":
 
     init_logger(cfg)
 
-    _detector = Yolov8ORT(
+    _detector = YoloORT(
         cfg.det_model_path,
         device=cfg.device,
         gpu_num=cfg.gpu_num,

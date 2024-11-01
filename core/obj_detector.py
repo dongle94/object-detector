@@ -33,33 +33,24 @@ class ObjectDetector(object):
             max_det = cfg.yolo_max_det
             self.im_shape = None
             self.im0_shape = None
-            if self.detector_type in ["yolov5", "yolov8"]:
-                # model load with weight
-                ext = os.path.splitext(weight)[1]
-                if ext in ['.pt', '.pth']:
-                    from core.yolo.yolo_pt import YoloTorch
-                    model = YoloTorch
-                    self.framework = 'torch'
-                elif ext == '.onnx':
-                    from core.yolo.yolo_ort import YoloORT
-                    model = YoloORT
-                    self.framework = 'onnx'
-                elif ext in ['.engine', '.bin']:
-                    from core.yolo.yolo_trt import YoloTRT
-                    model = YoloTRT
-                    self.framework = 'trt'
-                else:
-                    raise FileNotFoundError('No YOLO(v5,v8) weight File!')
-            elif self.detector_type == "yolov10":
-                ext = os.path.splitext(weight)[1]
-                if ext in ['.pt', '.pth']:
-                    from core.yolo.yolov10_pt import Yolov10Torch
-                    model = Yolov10Torch
-                    self.framework = 'torch'
-                else:
-                    raise FileNotFoundError('No Yolov10 weight File!')
+
+            # model load with weight
+            ext = os.path.splitext(weight)[1]
+            if ext in ['.pt', '.pth']:
+                from core.yolo.yolo_pt import YoloTorch
+                model = YoloTorch
+                self.framework = 'torch'
+            elif ext == '.onnx':
+                from core.yolo.yolo_ort import YoloORT
+                model = YoloORT
+                self.framework = 'onnx'
+            elif ext in ['.engine', '.bin']:
+                from core.yolo.yolo_trt import YoloTRT
+                model = YoloTRT
+                self.framework = 'trt'
             else:
-                raise NotImplementedError(f'Unknown detector type: {self.detector_type}')
+                raise FileNotFoundError('No YOLO(v5,v8,v10) weight File!')
+
             self.detector = model(
                 weight=weight,
                 device=device,
@@ -78,6 +69,9 @@ class ObjectDetector(object):
             # warm up
             self.detector.warmup()
             self.logger.info(f"Successfully loaded weight from {weight}")
+        else:
+            raise NotImplementedError(f'Unknown detector type: {self.detector_type}')
+
 
         # logging
         self.f_cnt = 0

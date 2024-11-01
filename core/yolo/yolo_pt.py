@@ -118,7 +118,8 @@ if __name__ == "__main__":
         iou_thres=cfg.yolo_nms_iou,
         agnostic=cfg.yolo_agnostic_nms,
         max_det=cfg.yolo_max_det,
-        classes=cfg.det_obj_classes
+        classes=cfg.det_obj_classes,
+        model_type=cfg.det_model_type
     )
     _detector.warmup()
 

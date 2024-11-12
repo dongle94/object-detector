@@ -18,6 +18,12 @@
     - [YOLOv10-M](https://github.com/ultralytics/assets/releases/download/v8.2.0/yolov10m.pt), [YOLOv10-B](https://github.com/ultralytics/assets/releases/download/v8.2.0/yolov10b.pt)
     - [YOLOv10-L](https://github.com/ultralytics/assets/releases/download/v8.2.0/yolov10l.pt), [YOLOv10-X](https://github.com/ultralytics/assets/releases/download/v8.2.0/yolov10x.pt)
 
+- YOLOv11: https://docs.ultralytics.com/models/yolo11/
+  - pt(torch) download link
+    - [YOLO11n](https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11n.pt), [YOLO11s](https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11s.pt)
+    - [YOLO11m](https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11m.pt), [YOLO11l](https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11l.pt), [YOLO11x](https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11x.pt)
+
+
 ### Object Tracker
 #### OSNET
 - MODEL ZOO 

@@ -13,3 +13,6 @@ dist
 
 # object traking
 cache
+
+# python
+__pycache__

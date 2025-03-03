@@ -21,8 +21,8 @@ MEDIA:
 
 # Object Detector
 DET:
-  MODEL_TYPE: yolov8
-  DET_MODEL_PATH: './weights/yolov8/yolov8m.pt'
+  MODEL_TYPE: yolov11
+  DET_MODEL_PATH: './weights/yolov11/yolo11m.pt'
   HALF: False
   CONF_THRES: 0.5
   OBJ_CLASSES: None

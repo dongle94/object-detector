@@ -1,11 +1,17 @@
-# weight files
-weights
+# python
+__pycache__
 
 # intelliJ
 .idea
 
-# log
+# vscode
+.vscode
+
+# logs files
 log
+
+# AI(DL) model weight
+weights
 
 # pyinstaller
 build
@@ -13,6 +19,3 @@ dist
 
 # object traking
 cache
-
-# python
-__pycache__

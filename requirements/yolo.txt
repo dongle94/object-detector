@@ -7,5 +7,6 @@ tqdm
 requests
 
 # for training
-scipy
-psutil
+py-cpuinfo
+thop
+pandas

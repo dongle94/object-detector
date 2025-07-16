@@ -1,3 +1,4 @@
+import os
 import sys
 import time
 import copy
@@ -36,6 +37,7 @@ class YoloTorch(YOLO):
             self.fp16 = False
             self.logger.info(f"{kwargs['model_type']} pytorch will not use fp16. It will apply fp32 precision.")
 
+        self.logger.info(f"Model load: {os.path.abspath(weight)}")
         model, weight = attempt_load_one_weight(weight, device=self.device, inplace=True, fuse=fuse)
         self.model = model.half() if self.fp16 else model.float()
         self.model.eval()

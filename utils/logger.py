@@ -10,14 +10,14 @@ logger = None
 log_initialize = False
 
 
-def init_logger(cfg=None, name="default", filename="", loglevel="debug"):
+def init_logger(cfg=None, name="default", loglevel="debug"):
     # LOG FORMATTING
     # https://docs.python.org/ko/3.8/library/logging.html#logrecord-attributes
     global logger
     global log_initialize
     if log_initialize is True:
         return
-    
+
     log_format = "[%(asctime)s]-[%(levelname)s]-[%(name)s]-[%(module)s](%(process)d): %(message)s"
     timestamp = datetime.now().strftime("%Y%m%d")
 

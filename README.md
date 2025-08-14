@@ -36,3 +36,5 @@ $ pip install -r ./requirements.txt
 - YOLOv8: https://docs.ultralytics.com/models/yolov8/
 - YOLOv10: https://github.com/THU-MIG/yolov10
   - https://docs.ultralytics.com/models/yolov10/
+- YOLOv11: https://docs.ultralytics.com/models/yolo11/
+- YOLOv12: https://docs.ultralytics.com/ko/models/yolo12/

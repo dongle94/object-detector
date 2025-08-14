@@ -1,7 +1,7 @@
 # requirements for yolo
---extra-index-url https://download.pytorch.org/whl/cu124
+--extra-index-url https://download.pytorch.org/whl/cu126
 torch==2.8.0
-torchvision==0.19.1
+torchvision==0.23.0
 matplotlib
 tqdm
 requests

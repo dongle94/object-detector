@@ -14,7 +14,7 @@ Object Detection based Project
 - recommend conda envs
 - Pytorch
   - torch 2.x (test version)
-    - test: 2.0.1 / 2.4.1
+    - test: 2.0.1 / 2.4.1 / 2.8.0
   - torchvision: torch version compatibility
 - Optimization
   - onnx >= 1.15.x
@@ -28,10 +28,8 @@ $ pip install -r ./requirements.txt
 ## Modules
 - medialoader
 - detectors
-  - YOLOv5, YOLOv8, YOLOv10
+  - YOLOv5, YOLOv8, YOLOv10, YOLOv11, YOLOv12
     - pytorch, onnx, trt
-- ~~object_tracker~~
-  - ~~osnet~~
 
 ## Reference
 - YOLOv5: https://docs.ultralytics.com/models/yolov5/
